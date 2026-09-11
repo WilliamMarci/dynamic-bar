@@ -87,6 +87,7 @@ export const DynamicBar = GObject.registerClass({
         this._leftFlashActor = null;
         this._indicators = new Map();
         this._activities = new Map();
+        this._activityDotOrder = [];
         this._activityPreviewTimerId = 0;
         this._activityHovered = false;
         this._activityPinnedId = null;
@@ -680,6 +681,10 @@ export const DynamicBar = GObject.registerClass({
     }
 
     _rebuildDots() {
+        const oldOrder = this._activityDotOrder;
+        const newOrder = [...this._activities.keys()];
+        const membershipChanged = oldOrder.length !== newOrder.length ||
+            oldOrder.some((id, index) => newOrder[index] !== id);
         this._activityBox.remove_all_children();
 
         const options = this._options;
@@ -819,7 +824,34 @@ export const DynamicBar = GObject.registerClass({
                 return Clutter.EVENT_STOP;
             });
             this._activityBox.add_child(holder);
+
+            if (membershipChanged && this._options.animationsEnabled) {
+                const oldIndex = oldOrder.indexOf(activityId);
+                if (oldIndex < 0) {
+                    visual.scale_x = 0.25;
+                    visual.scale_y = 0.25;
+                    visual.opacity = 0;
+                    visual.ease({scale_x: 1, scale_y: 1, opacity: 255,
+                        duration: 240,
+                        mode: Clutter.AnimationMode.EASE_OUT_BACK});
+                } else {
+                    // Positions are anchored at the right edge beside the bar.
+                    // Comparing distance-from-right makes only dots left of a
+                    // removed slot slide right to close the gap.
+                    const oldDistance = oldOrder.length - 1 - oldIndex;
+                    const newDistance = newOrder.length - 1 -
+                        newOrder.indexOf(activityId);
+                    const slot = hitSize + 2;
+                    const delta = -(oldDistance - newDistance) * slot;
+                    if (delta !== 0) {
+                        holder.translation_x = delta;
+                        holder.ease({translation_x: 0, duration: 220,
+                            mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+                    }
+                }
+            }
         }
+        this._activityDotOrder = newOrder;
         this._syncLayout();
     }
 
