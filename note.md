@@ -162,7 +162,7 @@ Activity action 必须是 `activityId + actionId` 回调，Shell 不执行第三
 
 Timer 使用 monotonic time；暂停时停止刷新，恢复后按剩余时间重建 deadline，没有计时器时不得保留一秒刷新源。打印只消费 CUPS notifier 明确广播的可见任务，不扫描队列；按 notifier 的 11 参数 Job 信号与 6 参数 Printer 信号解析，job-state 用 IPP 枚举（processing/held/stopped/canceled/aborted/completed）；页数未知显示 `N/?`，不得伪造百分比。U 盘只由 `Gio.VolumeMonitor` 事件驱动，并区分 unmount/eject 与物理断电。GNOME 通知转接默认关闭，使用独立开关与 application ID 过滤表，且只生成 small notification，不实现第二个通知中心。
 
-原有 dynamic bar 与 Media 面板的进度条外观、尺寸关系和交互是重构基准，而不是不可修改的旧实现。底层统一由 `progressBar.js` 提供圆角轨道、填充和缓动；Media 保留原来的白色视觉、4/6px 状态高度与 seek，Timer、Live Activity、Removable 和 Printing 在同一控件上参数化主题色、斜纹和状态。新增卡片的标准动作统一使用 `controls.js` 的圆形图标按钮，常态不显示文字背景，hover/focus 才显示圆形反馈和动作提示。动作集合必须随状态裁剪，例如 Timer running 只显示 Pause，paused 只显示 Resume，结束后不再显示运行控制。
+Dynamic bar 与 island 内的 progress bar 是两个内部差异很大的独立组件，不能共用绘制函数、actor 或动画状态。`barBackground.js` 独立负责 bar 的几何、激活光效、常驻进度和 Activity 预览；`progressBar.js` 只负责 island 卡片内部的进度控件。两者可以遵循一致的圆角视觉语言，但实现依赖必须单向停留在各自模块内。Media 保留原来的白色视觉、4/6px 状态高度与 seek，Timer、Live Activity、Removable 和 Printing 在 island progress 控件上参数化主题色、斜纹和状态。新增卡片的标准动作统一使用 `controls.js` 的圆形图标按钮，常态不显示文字背景，hover/focus 才显示圆形反馈和动作提示。动作集合必须随状态裁剪，例如 Timer running 只显示 Pause，paused 只显示 Resume，结束后不再显示运行控制。
 
 Activity dot 的 hover 与点击属于统一的进度预览入口：hover 延迟触发后，底部 dynamic bar 从 0 生长到该 Activity 当前进度，并在指针仍停留于圆点区时保持；Activity 已完成部分使用主题色填充并覆盖主题色对应的暗色动态斜纹。running 时斜纹移动，paused 时保留在当前位置但停止移动。Shift+点击仍用于持久固定，普通点击用于打开并聚焦对应卡片。
 

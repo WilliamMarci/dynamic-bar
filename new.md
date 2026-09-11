@@ -160,3 +160,4 @@
 - [ ] Timer、Live Activity、Removable、Printing 卡片使用相同的标题/百分比/动作头部和下方全宽进度条节奏，不再出现单行内容横向溢出。
 - [ ] Timer/Activity 的底部 dynamic bar 使用主题色填充和暗色斜纹；running 时斜纹移动，paused 时进度与斜纹位置均冻结。
 - [ ] 点击 Activity dot 切换到 Timer 卡片后，底部 dynamic bar 仍显示该 Timer 的主题色动态斜纹进度，但 bar 宽度、高度和位置不发生额外变化。
+- [ ] `barBackground.js` 与 `progressBar.js` 没有绘制依赖；dynamic bar 和 island progress 分别维护自己的 actor、绘制路径与动画状态。
