@@ -1,0 +1,10 @@
+{
+  "name": "Dynamic Bar",
+  "description": "A click-expandable dynamic bar attached below the top panel, with an API for custom content such as progress lines and icons.",
+  "uuid": "dynamic-bar@william-marci",
+  "settings-schema": "org.gnome.shell.extensions.dynamic-bar",
+  "version": 1,
+  "shell-version": [
+    "50"
+  ]
+}

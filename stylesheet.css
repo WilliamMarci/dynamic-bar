@@ -1,0 +1,225 @@
+.dynamic-bar-launcher {
+    spacing: 4px;
+}
+
+.dynamic-bar-launcher-button {
+    border-radius: 8px;
+    padding: 5px;
+    background-color: transparent;
+}
+
+.dynamic-bar-launcher-button:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dynamic-bar-launcher-button:active {
+    background-color: rgba(255, 255, 255, 0.22);
+}
+
+.dynamic-bar-launcher-label {
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.dynamic-bar-zone {
+    spacing: 1px;
+}
+
+.dynamic-bar-activities {
+    spacing: 2px;
+}
+
+.dynamic-bar-activity-dot {
+    border-radius: 999px;
+    border: 1px solid white;
+    padding: 0;
+}
+
+.dynamic-bar-activity-dot.running {
+    background-color: #ff9f0a;
+}
+
+.dynamic-bar-activity-dot.success {
+    background-color: #33d17a;
+}
+
+.dynamic-bar-activity-dot.paused { background-color: #77767b; }
+.dynamic-bar-activity-dot.warning,
+.dynamic-bar-activity-dot.orphaned { background-color: #f6d32d; }
+.dynamic-bar-activity-dot.error,
+.dynamic-bar-activity-dot.cancelled { background-color: #e01b24; }
+
+.dynamic-bar-notification-pulse {
+    border-radius: 999px;
+    background-color: #57e389;
+}
+
+.dynamic-bar-track-notification-label {
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.dynamic-bar-media {
+    spacing: 0;
+}
+
+.dynamic-bar-media-top {
+    spacing: 12px;
+}
+
+.dynamic-bar-media-cover {
+    border-radius: 8px;
+}
+
+.dynamic-bar-media-marquee {
+    min-width: 1px;
+}
+
+.dynamic-bar-media-title {
+    font-weight: bold;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.dynamic-bar-media-subtitle {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.dynamic-bar-media-controls {
+    padding-bottom: 3px;
+    padding-top: 3px;
+}
+
+.dynamic-bar-media-control-buttons {
+    spacing: 10px;
+}
+
+.dynamic-bar-media-progress-seekable:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynamic-bar-control-container {
+    spacing: 0;
+}
+
+.dynamic-bar-control-strip {
+    padding: 0;
+}
+
+.dynamic-bar-control-toggle {
+    padding: 0;
+    color: rgba(255, 255, 255, 0.72);
+    background-color: transparent;
+}
+
+.dynamic-bar-control-toggle:hover,
+.dynamic-bar-control-toggle:focus {
+    color: rgba(255, 255, 255, 1);
+    background-color: rgba(255, 255, 255, 0.10);
+    border-radius: 999px;
+}
+
+.dynamic-bar-control-pages {
+    spacing: 4px;
+}
+
+.dynamic-bar-control-dot {
+    width: 5px;
+    height: 5px;
+    padding: 0;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.30);
+}
+
+.dynamic-bar-control-dot:hover,
+.dynamic-bar-control-dot.active {
+    background-color: rgba(255, 255, 255, 0.90);
+}
+
+.dynamic-bar-media-button {
+    border-radius: 999px;
+    padding: 4px;
+    background-color: transparent;
+}
+
+.dynamic-bar-media-button:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dynamic-bar-media-source {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: 6px;
+}
+
+.dynamic-bar-notice {
+    spacing: 10px;
+}
+
+.dynamic-bar-notice-row {
+    spacing: 8px;
+}
+
+.dynamic-bar-notice-title {
+    font-weight: bold;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.dynamic-bar-notice-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.dynamic-bar-live-list {
+    spacing: 2px;
+}
+
+.dynamic-bar-live-row {
+    padding: 5px 7px;
+    border-radius: 7px;
+    background-color: transparent;
+}
+
+.dynamic-bar-live-row:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+.dynamic-bar-live-row-content {
+    spacing: 8px;
+}
+
+.dynamic-bar-live-title {
+    font-size: 11px;
+}
+
+.dynamic-bar-live-progress {
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+.dynamic-bar-live-progress-fill {
+    border-radius: 999px;
+    background-color: #ff9f0a;
+}
+
+.dynamic-bar-live-progress-fill.completed {
+    background-color: #33d17a;
+}
+
+.dynamic-bar-live-percent {
+    min-width: 32px;
+    font-size: 10px;
+}
+
+.dynamic-bar-live-summary { font-size: 9px; color: rgba(255, 255, 255, 0.62); }
+.dynamic-bar-live-actions { spacing: 5px; }
+.dynamic-bar-live-action {
+    padding: 3px 7px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.10);
+}
+.dynamic-bar-live-action:hover { background-color: rgba(255, 255, 255, 0.18); }
+.dynamic-bar-live-action.destructive { color: #ff7b63; }
+.dynamic-bar-live-progress.indeterminate { background-color: rgba(255, 255, 255, 0.32); }

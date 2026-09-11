@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.dynamic-bar"
+          path="/org/gnome/shell/extensions/dynamic-bar/">
+    <key name="toggle-bar" type="as">
+      <default>['&lt;Super&gt;&lt;Shift&gt;b']</default>
+      <summary>Toggle the dynamic bar</summary>
+      <description>Keyboard shortcut used to expand or collapse the dynamic bar.</description>
+    </key>
+
+    <key name="handle-width" type="i">
+      <default>72</default>
+      <summary>Dynamic bar width</summary>
+      <description>Width of the dynamic bar in pixels.</description>
+    </key>
+    <key name="bar-long-width" type="i">
+      <default>144</default>
+      <summary>Dynamic bar active width</summary>
+      <description>Width of the dynamic bar while hovered or expanded, in pixels.</description>
+    </key>
+    <key name="handle-height" type="i">
+      <default>4</default>
+      <summary>Dynamic bar height</summary>
+      <description>Height of the dynamic bar in pixels.</description>
+    </key>
+    <key name="handle-radius" type="i">
+      <default>2</default>
+      <summary>Dynamic bar corner radius</summary>
+      <description>Corner radius of the dynamic bar in pixels.</description>
+    </key>
+    <key name="handle-gap" type="i">
+      <default>2</default>
+      <summary>Gap</summary>
+      <description>Gap between the panel (or dynamic island) and the dynamic bar in pixels.</description>
+    </key>
+    <key name="handle-alpha" type="d">
+      <default>0.2</default>
+      <summary>Dynamic bar opacity</summary>
+      <description>Opacity of the dynamic bar.</description>
+    </key>
+    <key name="handle-hover-alpha" type="d">
+      <default>0.55</default>
+      <summary>Dynamic bar hover opacity</summary>
+      <description>Opacity of the dynamic bar while hovered.</description>
+    </key>
+    <key name="bar-track-alpha" type="d">
+      <default>0.2</default>
+      <summary>Track opacity</summary>
+      <description>Opacity of the progress track while the bar is active.</description>
+    </key>
+    <key name="bar-progress-alpha" type="d">
+      <default>0.9</default>
+      <summary>Progress opacity</summary>
+      <description>Opacity of the progress fill while the bar is active.</description>
+    </key>
+
+    <key name="panel-width" type="i">
+      <default>212</default>
+      <summary>Dynamic island minimum width</summary>
+      <description>Minimum width of the dynamic island in pixels.</description>
+    </key>
+    <key name="panel-height" type="i">
+      <default>38</default>
+      <summary>Dynamic island minimum height</summary>
+      <description>Minimum height of the dynamic island in pixels.</description>
+    </key>
+    <key name="panel-top-radius" type="i">
+      <default>8</default>
+      <summary>Fusion fillet radius</summary>
+      <description>Radius of the concave corner where the dynamic island meets the top bar.</description>
+    </key>
+    <key name="panel-bottom-radius" type="i">
+      <default>8</default>
+      <summary>Bottom corner radius</summary>
+      <description>Radius of the bottom corners of the dynamic island.</description>
+    </key>
+    <key name="island-padding" type="i">
+      <default>10</default>
+      <summary>Dynamic island padding</summary>
+      <description>Padding around the dynamic island content in pixels.</description>
+    </key>
+    <key name="compact-control-height" type="i">
+      <default>9</default>
+      <summary>Compact control strip height</summary>
+      <description>Shared height for thin island controls and page navigation, in pixels.</description>
+    </key>
+    <key name="maximized-dark-color" type="s">
+      <default>'#101014'</default>
+      <summary>Maximized background for dark style</summary>
+      <description>Opaque island background used for maximized windows in dark style.</description>
+    </key>
+    <key name="maximized-light-color" type="s">
+      <default>'#f2f2f2'</default>
+      <summary>Maximized background for light style</summary>
+      <description>Opaque island background used for maximized windows in light style.</description>
+    </key>
+
+    <key name="hover-duration" type="i">
+      <default>140</default>
+      <summary>Hover animation duration</summary>
+      <description>Duration of the bar hover animation in milliseconds.</description>
+    </key>
+    <key name="expand-duration" type="i">
+      <default>180</default>
+      <summary>Expand duration</summary>
+      <description>Duration of the expand animation in milliseconds.</description>
+    </key>
+    <key name="collapse-duration" type="i">
+      <default>180</default>
+      <summary>Collapse duration</summary>
+      <description>Duration of the collapse animation in milliseconds.</description>
+    </key>
+    <key name="auto-collapse-delay" type="i">
+      <default>1200</default>
+      <summary>Auto collapse delay</summary>
+      <description>Collapse automatically after the pointer leaves the bar for this many milliseconds. 0 disables it.</description>
+    </key>
+    <key name="notification-decay" type="i">
+      <default>2500</default>
+      <summary>Notification decay</summary>
+      <description>How long transient notifications (charging, lock keys) stay expanded, in milliseconds.</description>
+    </key>
+    <key name="track-flash-duration" type="i">
+      <default>1200</default>
+      <summary>Track flash duration</summary>
+      <description>How long the music note indicator stays visible on track changes, in milliseconds.</description>
+    </key>
+    <key name="animations-enabled" type="b">
+      <default>true</default>
+      <summary>Popup animations</summary>
+      <description>Animate dynamic island and dynamic bar transitions.</description>
+    </key>
+
+    <key name="launcher-apps" type="as">
+      <default>[]</default>
+      <summary>Launcher applications</summary>
+      <description>Desktop file ids shown as buttons in the dynamic island launcher, separated by commas.</description>
+    </key>
+    <key name="launcher-items" type="s">
+      <default>'[]'</default>
+      <summary>Structured launcher items</summary>
+      <description>JSON configuration for launcher names, icons, commands and desktop actions.</description>
+    </key>
+    <key name="media-enabled" type="b">
+      <default>true</default>
+      <summary>Media integration</summary>
+      <description>Show media playback progress on the dynamic bar and media controls in the island.</description>
+    </key>
+    <key name="notifications-enabled" type="b">
+      <default>true</default>
+      <summary>Dynamic Bar notifications</summary>
+      <description>Allow this extension to show transient notifications.</description>
+    </key>
+    <key name="notification-forwarding-enabled" type="b">
+      <default>false</default>
+      <summary>Forward GNOME notifications</summary>
+      <description>Show a small notification when GNOME receives a notification.</description>
+    </key>
+    <key name="notification-filter" type="as">
+      <default>[]</default>
+      <summary>Ignored notification applications</summary>
+      <description>Application IDs excluded from notification forwarding.</description>
+    </key>
+    <key name="bluetooth-enabled" type="b">
+      <default>true</default>
+      <summary>Bluetooth notifications</summary>
+      <description>Notify when a Bluetooth device connects or disconnects.</description>
+    </key>
+    <key name="charging-enabled" type="b">
+      <default>true</default>
+      <summary>Charging notifications</summary>
+      <description>Expand the island when the battery starts charging.</description>
+    </key>
+    <key name="lock-keys-enabled" type="b">
+      <default>true</default>
+      <summary>Lock key indicators</summary>
+      <description>Show lock key state on the bar and expand the island when a lock key changes.</description>
+    </key>
+    <key name="battery-low-threshold" type="i">
+      <default>20</default>
+      <summary>Low battery threshold</summary>
+      <description>Show a charging notification when the battery drops to this percentage.</description>
+    </key>
+  </schema>
+</schemalist>
