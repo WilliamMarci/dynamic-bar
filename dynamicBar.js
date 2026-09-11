@@ -90,6 +90,7 @@ export const DynamicBar = GObject.registerClass({
         this._activityPreviewTimerId = 0;
         this._activityHovered = false;
         this._activityPinnedId = null;
+        this._activityCreateTimers = new Map();
         this._progress = 0;
         this._progressActive = false;
         this._islandWidth = 0;
@@ -190,7 +191,7 @@ export const DynamicBar = GObject.registerClass({
             (_stage, event) => this._onCapturedEvent(event));
 
         this._settings?.connectObject('changed',
-            () => this._onSettingsChanged(), this);
+            (_settings, key) => this._onSettingsChanged(key), this);
 
         this._reloadOptions();
         this._updatePanelColor(false);
@@ -560,6 +561,7 @@ export const DynamicBar = GObject.registerClass({
 
     setActivity(id, activity) {
         if (activity) {
+            const isNew = !this._activities.has(id);
             const state = activity === true ? {} : activity;
             this._activities.set(id, state);
             if (this._activityPinnedId === id) {
@@ -569,10 +571,33 @@ export const DynamicBar = GObject.registerClass({
                 this._bar.setPinnedActivityPreview(value, {
                     color: this._parseColor(this._activityDotColor(status)),
                     striped: true,
-                    animateStripes: status !== 'paused',
+                    animateStripes: status === 'running' || status === 'warning',
                 });
+            } else if (isNew && state.status !== 'orphaned' &&
+                (!state.createdAt || Date.now() - state.createdAt < 5000)) {
+                const oldTimer = this._activityCreateTimers.get(id);
+                if (oldTimer) GLib.source_remove(oldTimer);
+                const timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1250,
+                    () => {
+                        this._activityCreateTimers.delete(id);
+                        const current = this._activities.get(id);
+                        if (!current || this._activityPinnedId)
+                            return GLib.SOURCE_REMOVE;
+                        const currentStatus = current.status ?? 'running';
+                        const value = Number.isFinite(current.progress)
+                            ? current.progress : 0.35;
+                        this.previewActivityProgress(value,
+                            this._activityDotColor(currentStatus),
+                            currentStatus === 'running' ||
+                                currentStatus === 'warning', 2800);
+                        return GLib.SOURCE_REMOVE;
+                    });
+                this._activityCreateTimers.set(id, timerId);
             }
         } else {
+            const createTimer = this._activityCreateTimers.get(id);
+            if (createTimer) GLib.source_remove(createTimer);
+            this._activityCreateTimers.delete(id);
             if (this._activityPinnedId === id) {
                 this._activityPinnedId = null;
                 this._bar.clearActivityPreview();
@@ -731,7 +756,7 @@ export const DynamicBar = GObject.registerClass({
                             const preview = Number.isFinite(state.progress)
                                 ? state.progress : 0.35;
                             this.previewActivityProgress(preview, color,
-                                status !== 'paused');
+                                status === 'running' || status === 'warning');
                             visual.ease({
                                 scale_x: options.activityDotHoverScale,
                                 scale_y: options.activityDotHoverScale,
@@ -770,7 +795,7 @@ export const DynamicBar = GObject.registerClass({
                 const preview = Number.isFinite(state.progress)
                     ? state.progress : 0.35;
                 this.previewActivityProgress(preview, color,
-                    status !== 'paused');
+                    status === 'running' || status === 'warning');
                 return Clutter.EVENT_STOP;
             });
             this._activityBox.add_child(holder);
@@ -790,13 +815,15 @@ export const DynamicBar = GObject.registerClass({
                 color: this._parseColor(this._activityDotColor(
                     state.status ?? 'running')),
                 striped: true,
-                animateStripes: state.status !== 'paused',
+                animateStripes: state.status === 'running' ||
+                    state.status === 'warning',
             });
         }
         this._rebuildDots();
     }
 
-    previewActivityProgress(progress, color = null, animateStripes = true) {
+    previewActivityProgress(progress, color = null, animateStripes = true,
+        duration = 1800) {
         if (this._activityPreviewTimerId)
             GLib.source_remove(this._activityPreviewTimerId);
         this._bar.setActivityPreview(progress, {
@@ -809,7 +836,7 @@ export const DynamicBar = GObject.registerClass({
             this._activityPreviewTimerId = 0;
             if (this._activityHovered) {
                 this._activityPreviewTimerId = GLib.timeout_add(
-                    GLib.PRIORITY_DEFAULT, 1800, () => {
+                    GLib.PRIORITY_DEFAULT, duration, () => {
                         tick();
                         return GLib.SOURCE_REMOVE;
                     });
@@ -818,7 +845,7 @@ export const DynamicBar = GObject.registerClass({
             this._syncBarPaint();
         };
         this._activityPreviewTimerId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, 1800, () => {
+            GLib.PRIORITY_DEFAULT, duration, () => {
                 tick();
                 return GLib.SOURCE_REMOVE;
             });
@@ -909,6 +936,9 @@ export const DynamicBar = GObject.registerClass({
     }
 
     destroy() {
+        for (const timerId of this._activityCreateTimers.values())
+            GLib.source_remove(timerId);
+        this._activityCreateTimers.clear();
         if (this._destroyed)
             return;
 
@@ -1181,8 +1211,10 @@ export const DynamicBar = GObject.registerClass({
             () => this._updatePanelColor(true), this);
     }
 
-    _onSettingsChanged() {
+    _onSettingsChanged(key = '') {
         this._reloadOptions();
+        if (key === 'card-page-width' && this._expanded && this._deck)
+            this.cardsChanged();
         this._syncLayout();
         this._updatePanelColor(false);
     }

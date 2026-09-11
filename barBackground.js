@@ -148,6 +148,7 @@ class BarBackground extends St.DrawingArea {
         this._tickId = 0;
         this._activityStriped = false;
         this._activityStripeAnimated = false;
+        this._activityPreviewPinned = false;
         this._stripePhase = 0;
         this._stripeTickId = 0;
 
@@ -183,6 +184,7 @@ class BarBackground extends St.DrawingArea {
     setProgress(progress, active, animate = false) {
         const target = Math.min(Math.max(progress, 0), 1);
         this._activityStriped = false;
+        this._activityPreviewPinned = false;
         this._stopStripeTick();
         if (this._glowActive) {
             this._targetProgress = target;
@@ -254,6 +256,7 @@ class BarBackground extends St.DrawingArea {
         this._activityColor = color ?? [0.36, 0.68, 0.95, 1];
         this._activityStriped = striped;
         this._activityStripeAnimated = animateStripes;
+        this._activityPreviewPinned = false;
         this._progress = 0;
         if (striped && animateStripes)
             this._stripedTick();
@@ -263,22 +266,25 @@ class BarBackground extends St.DrawingArea {
     /** Persistent preview while an activity dot is pinned (Shift+click). */
     setPinnedActivityPreview(progress, {color = null, striped = true,
         animateStripes = striped} = {}) {
-        this._stopTick();
+        const firstFrame = !this._activityPreviewPinned;
+        this._activityPreviewPinned = true;
         this._activityColor = color ?? [0.36, 0.68, 0.95, 1];
         this._activityStriped = striped;
         this._activityStripeAnimated = animateStripes;
-        this._progress = Math.min(Math.max(progress, 0), 1);
-        this._fromProgress = this._progress;
-        this._targetProgress = this._progress;
         this._active = true;
+        if (!animateStripes)
+            this._stopStripeTick();
         if (striped && animateStripes)
             this._stripedTick();
-        this.queue_repaint();
+        if (firstFrame)
+            this._progress = 0;
+        this.easeProgress(progress, firstFrame ? 220 : 180);
     }
 
     clearActivityPreview() {
         this._activityStriped = false;
         this._activityStripeAnimated = false;
+        this._activityPreviewPinned = false;
         this._activityColor = null;
         this._stopStripeTick();
     }

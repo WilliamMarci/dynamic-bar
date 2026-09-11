@@ -220,6 +220,10 @@ export class IslandCardDeck {
         return Math.max(16, this._settings.get_int('compact-control-height'));
     }
 
+    _pageWidth() {
+        return Math.max(420, this._settings.get_int('card-page-width'));
+    }
+
     destroy() {
         this._destroyCard();
         this._destroyAttached();
@@ -247,6 +251,10 @@ export class IslandCardDeck {
             });
         }
         if (this._cardActor) {
+            // Persistent cards share one content width. The island itself is
+            // still measured from the current presentation, so notifications
+            // and attached pages remain naturally sized.
+            this._cardActor.set_width(this._pageWidth());
             const paddingX = this._cards[index].layout?.paddingX ?? 0;
             if (paddingX > 0) {
                 this._cardActor.set_style(

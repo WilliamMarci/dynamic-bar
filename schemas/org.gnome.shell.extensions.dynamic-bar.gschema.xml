@@ -64,6 +64,11 @@
       <summary>Dynamic island minimum height</summary>
       <description>Minimum height of the dynamic island in pixels.</description>
     </key>
+    <key name="card-page-width" type="i">
+      <default>520</default>
+      <summary>Persistent card page width</summary>
+      <description>Shared content width for media, activity, timer, device and printing pages.</description>
+    </key>
     <key name="panel-top-radius" type="i">
       <default>8</default>
       <summary>Fusion fillet radius</summary>

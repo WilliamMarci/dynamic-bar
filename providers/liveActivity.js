@@ -245,7 +245,8 @@ export class LiveActivityProvider extends BarProvider {
             const progress = task.progress?.kind === 'determinate'
                 ? Number(task.progress.value) : NaN;
             this.bar.activity(group, {status: task.status, progress,
-                ring: task.ring, onClick: () => this._focusGroup(group)});
+                ring: task.ring, createdAt: task.createdAt,
+                onClick: () => this._focusGroup(group)});
         }
         this._publishedGroups = new Set(groups.keys());
     }

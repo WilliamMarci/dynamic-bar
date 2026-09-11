@@ -168,6 +168,8 @@ Activity dot 的 hover 与点击属于统一的进度预览入口：hover 延迟
 
 通过 Activity dot 切换到 Timer 卡片时，必须在卡片展开完成后再应用 Activity bar 绘制，避免展开流程把它覆盖成普通白条。这里只切换主题色进度与动态斜纹，不改变 dynamic bar 当时的宽度、高度和水平位置。
 
-Activity、Timer、Removable 和 Printing page 使用紧凑单行：`title | progress | value | actions`。Page 不采用统一固定宽度；每个 page 的自然宽度加自身 `paddingX` 决定 island 目标宽度，切页后重新测量并动画调整。内容必须避开顶部融合圆角，hover/按钮边框不得绘制到 island 可见背景之外。专用任务只进入对应 page，不能同时重复出现在总 Activity page。
+Activity、Timer、Removable、Printing 与 Media 等常驻 page 使用统一的可配置内容宽度，Activity 类列表保持紧凑单行：`title | progress | value | actions`。统一的是 page 内容宽度，不是 island 本体宽度；island 每次仍按当前 presentation 的自然尺寸测量，因此 notification、small notification 和展开的 Launcher 可以拥有不同宽度。内容必须避开顶部融合圆角，hover/按钮边框不得绘制到 island 可见背景之外。专用任务只进入对应 page，不能同时重复出现在总 Activity page。
+
+Activity 创建后延迟到 small notification 结束附近，在不改变 bar 几何的情况下短暂展示缩小版 Activity 进度；首次从 0 生长。Shift 固定 dot 后持续显示，后续上报从当前动画帧缓动到新值，不能每次重置到 0。running/warning 的暗色斜纹移动，paused 和终态保留静止斜纹。
 
 Stop tracking 必须能删除最后一项；最后一项消失后对应 page 立即从 deck 移除，若没有其他卡片则回退到 Launcher。Island 自动收回必须同时检查背景、内容 holder 和 bar 的 hover，鼠标位于任何 island 内容上时不得收回。可恢复错误统一用 `[Dynamic Bar][模块]` 结构写入 GNOME Shell journal，并携带对象 ID 或配置项上下文，禁止吞掉解析、图标、卡片创建和设备操作异常。

@@ -517,6 +517,7 @@ export default class DynamicBarPreferences extends ExtensionPreferences {
         finePage.add(islandGroup);
         addSpinRow(islandGroup, settings, 'panel-width', 'Min width (px)', {min: 60, max: 1200, step: 2});
         addSpinRow(islandGroup, settings, 'panel-height', 'Min height (px)', {min: 8, max: 200, step: 1});
+        addSpinRow(islandGroup, settings, 'card-page-width', 'Card page width (px)', {min: 420, max: 1000, step: 2});
         addSpinRow(islandGroup, settings, 'island-padding', 'Padding (px)', {min: 0, max: 60, step: 1});
         addSpinRow(islandGroup, settings, 'panel-top-radius', 'Fusion fillet (px)', {min: 0, max: 60, step: 1});
         addSpinRow(islandGroup, settings, 'panel-bottom-radius', 'Bottom radius (px)', {min: 0, max: 60, step: 1});
