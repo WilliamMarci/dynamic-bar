@@ -13,6 +13,7 @@ import {LiveActivityProvider} from './providers/liveActivity.js';
 import {MediaProvider} from './providers/media.js';
 import {RemovableProvider} from './providers/removable.js';
 import {NotificationBridgeProvider} from './providers/notificationBridge.js';
+import {PrintingProvider} from './providers/printing.js';
 
 const TOGGLE_KEY = 'toggle-bar';
 
@@ -28,21 +29,26 @@ export default class DynamicBarExtension extends Extension {
 
         const launcher = new LauncherProvider(this._bar.api, this._settings);
         this._bar.setDefaultProvider(launcher);
+        this._bar.registerProvider(launcher);
         this._providers.push(launcher);
 
         const liveActivity = new LiveActivityProvider(this._bar.api, this._settings);
         this._bar.setLiveActivityProvider(liveActivity);
+        this._bar.registerProvider(liveActivity);
         this._providers.push(liveActivity);
         this._providers.push(new RemovableProvider(this._bar.api, this._settings,
             liveActivity));
         this._providers.push(new NotificationBridgeProvider(this._bar.api,
             this._settings));
+        this._providers.push(new PrintingProvider(this._bar.api, this._settings,
+            liveActivity));
 
         if (this._settings.get_boolean('media-enabled')) {
             try {
                 const media = new MediaProvider(this._bar.api, this._settings,
                     launcher, liveActivity);
                 this._bar.setMediaProvider(media);
+                this._bar.registerProvider(media);
                 this._providers.push(media);
             } catch (error) {
                 console.error(`Dynamic Bar media provider disabled: ${error}`);

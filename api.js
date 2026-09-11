@@ -10,8 +10,8 @@ export class DynamicBarApi {
         this._controller = controller;
     }
 
-    progress(value, active = true) {
-        this._controller.setProgress(value, active);
+    progress(value, active = true, animate = false) {
+        this._controller.setProgress(value, active, animate);
     }
 
     status(id, actor) {
@@ -40,6 +40,21 @@ export class DynamicBarApi {
 
     rebuild(provider) {
         this._controller.rebuildProvider(provider);
+    }
+
+    /** True while the given provider's card/page/content is on screen. */
+    isShown(provider) {
+        return this._controller.isProviderShown(provider);
+    }
+
+    /** Ask the island to re-collect cards from all providers. */
+    cardsChanged() {
+        this._controller.cardsChanged();
+    }
+
+    /** Focus a deck card by id (also when the island is currently collapsed). */
+    focusCard(id) {
+        this._controller.focusCard(id);
     }
 
     holdOpen(duration = 1500) {

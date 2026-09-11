@@ -18,6 +18,14 @@ export class RemovableProvider extends BarProvider {
 
     _id(mount) { return `mount:${mount.get_uuid() || mount.get_root().get_uri()}`; }
 
+    _mountedRing() {
+        return this._settings.get_string('removable-mounted-color');
+    }
+
+    _unmountedRing() {
+        return this._settings.get_string('removable-unmounted-color');
+    }
+
     _add(mount, initial) {
         if (mount.is_shadowed()) return;
         const volume = mount.get_volume();
@@ -27,21 +35,32 @@ export class RemovableProvider extends BarProvider {
         this._mounts.set(id, mount);
         this._activities.registerInternal({id, title: mount.get_name(), source: 'gio-volume',
             type: 'removable', group: 'removable', status: 'paused', silentStart: true,
+            heartbeat: false, ring: this._mountedRing(),
             progress: {kind: 'indeterminate'}, actions: [
                 {id: 'open', label: 'Open', icon: 'folder-open-symbolic'},
                 {id: 'eject', label: drive?.can_eject() ? 'Eject' : 'Unmount',
                     icon: 'media-eject-symbolic', dangerous: true},
             ]}, {open: () => this._open(mount), eject: () => this._eject(id, mount)});
-        if (!initial) this._small(`${mount.get_name()} mounted`);
+        if (!initial)
+            this._notify(`${mount.get_name()} connected`, 'Removable volume',
+                drive?.can_eject() ? 'drive-removable-media-symbolic'
+                    : 'drive-harddisk-usb-symbolic');
     }
 
     _remove(mount) {
         const id = this._id(mount);
         if (!this._mounts.delete(id)) return;
-        if (this._requested.delete(id))
-            this._activities.finishInternal(id, {status: 'success', summary: 'Safely unmounted'});
-        else
+        const name = mount.get_name();
+        if (this._requested.delete(id)) {
+            this._activities.finishInternal(id, {status: 'success',
+                summary: 'Safely removed', ring: this._unmountedRing()});
+            this._notify(`${name} safely removed`, 'You can unplug it now',
+                'media-eject-symbolic');
+        } else {
+            this._notify(`${name} removed`, 'Volume disconnected',
+                'drive-removable-media-symbolic');
             this._activities.Dismiss(id);
+        }
     }
 
     _open(mount) {
@@ -69,10 +88,21 @@ export class RemovableProvider extends BarProvider {
         }
     }
 
-    _small(text) {
-        this.bar.notification({createIslandActor: () => new St.Label({text,
-            style_class: 'dynamic-bar-track-notification-label'}), destroyIslandActor() {}},
-        {timeout: 1200, passive: true, height: 10, paddingX: 8, paddingY: 0});
+    _notify(title, subtitle, iconName) {
+        this.bar.notification({createIslandActor: () => {
+            const box = new St.BoxLayout({style_class: 'dynamic-bar-notice'});
+            box.add_child(new St.Icon({icon_name: iconName, icon_size: 22}));
+            const labels = new St.BoxLayout({vertical: true});
+            labels.add_child(new St.Label({text: title,
+                style_class: 'dynamic-bar-notice-title'}));
+            if (subtitle) {
+                labels.add_child(new St.Label({text: subtitle,
+                    style_class: 'dynamic-bar-notice-label'}));
+            }
+            box.add_child(labels);
+            return box;
+        }, destroyIslandActor() {}}, {timeout: 2600, passive: true,
+            paddingX: 16, paddingY: 10});
     }
 
     destroy() {

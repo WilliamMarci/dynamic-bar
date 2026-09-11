@@ -3,20 +3,12 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
-import {BarProvider} from '../provider.js';
+import {BarProvider, smallNotificationHeight, smallNotificationLabel}
+    from '../provider.js';
 import {MprisService} from '../services/mprisService.js';
-import {IslandControlContainer} from './controlContainer.js';
-
-function drawRoundedRect(cr, x, y, width, height, radius) {
-    const r = Math.min(radius, width / 2, height / 2);
-
-    cr.newSubPath();
-    cr.arc(x + width - r, y + r, r, -Math.PI / 2, 0);
-    cr.arc(x + width - r, y + height - r, r, 0, Math.PI / 2);
-    cr.arc(x + r, y + height - r, r, Math.PI / 2, Math.PI);
-    cr.arc(x + r, y + r, r, Math.PI, Math.PI * 1.5);
-    cr.closePath();
-}
+import {createIconButton} from '../controls.js';
+import {createProgressBar, ISLAND_PROGRESS_HEIGHT, ISLAND_PROGRESS_WIDTH}
+    from '../progressBar.js';
 
 export class MediaProvider extends BarProvider {
     constructor(bar, settings, launcherProvider = null, liveActivityProvider = null) {
@@ -24,11 +16,6 @@ export class MediaProvider extends BarProvider {
         this._settings = settings;
         this._launcherProvider = launcherProvider;
         this._liveActivityProvider = liveActivityProvider;
-        this._unsubscribeLive = liveActivityProvider?.subscribe(() => {
-            const presentation = this.bar.presentation;
-            if (presentation.expanded && presentation.provider === this)
-                this.bar.rebuild(this);
-        }) ?? null;
         this._playerName = null;
         this._metadata = {};
         this._playing = false;
@@ -38,7 +25,6 @@ export class MediaProvider extends BarProvider {
         this._canSeek = false;
         this._seekPreview = null;
         this._seekGrab = null;
-        this._controlContainer = null;
         this._islandRefs = null;
         this._service = null;
         this._unsubscribe = null;
@@ -49,14 +35,8 @@ export class MediaProvider extends BarProvider {
         } catch (error) {
             console.error(`Dynamic Bar MPRIS service unavailable: ${error}`);
         }
-        this._settings.connectObject('changed::launcher-apps', () => {
-            this._controlContainer?.rebuildActivePage();
-            this.bar.refresh();
-        }, 'changed::launcher-items', () => {
-            this._controlContainer?.rebuildActivePage();
-            this.bar.refresh();
-        }, 'changed::compact-control-height', () =>
-            this._controlContainer?.syncHeight(), this);
+        this._settings.connectObject('changed::compact-control-height',
+            () => this.bar.cardsChanged(), this);
     }
 
     get isPlaying() {
@@ -71,10 +51,20 @@ export class MediaProvider extends BarProvider {
         return {paddingX: 24, paddingY: 14, minWidth: 372, minHeight: 116};
     }
 
+    getCards() {
+        if (!this.isAvailable)
+            return [];
+        return [{
+            id: 'media',
+            layout: this.getLayoutOptions(),
+            createActor: () => this._createMediaPanel(),
+            onDestroy: () => this._destroyMediaPanel(),
+        }];
+    }
+
     destroy() {
         this._settings.disconnectObject(this);
         this._unsubscribe?.();
-        this._unsubscribeLive?.();
         this._service?.destroy();
         this._service = null;
         this._islandRefs = null;
@@ -83,6 +73,7 @@ export class MediaProvider extends BarProvider {
     }
 
     _applyMediaState(state) {
+        const wasAvailable = this.isAvailable;
         const firstPlayer = !this._playerName && Boolean(state.name);
         const previousTrack = this._trackId;
         this._playerName = state.name;
@@ -100,11 +91,14 @@ export class MediaProvider extends BarProvider {
                 `playing=${state.playing} title=${this._title() || '(none)'} ` +
                 `length=${state.length || 'unknown'}`);
         }
+        if (wasAvailable !== this.isAvailable)
+            this.bar.cardsChanged();
         if (previousTrack && this._trackId !== previousTrack) {
             this._showTrackNotification();
             this.bar.flashProgressReset();
+        } else {
+            this._updateBar(true);
         }
-        this._updateBar();
         if (firstPlayer)
             this.bar.mediaActivated(this._progress);
         this._refreshIsland();
@@ -116,9 +110,9 @@ export class MediaProvider extends BarProvider {
             : 0;
     }
 
-    _updateBar() {
-        this.setProgress(this._length > 0 ? this._progress : 0,
-            this._playing);
+    _updateBar(animate = false) {
+        const active = this._playing || this._length > 0;
+        this.setProgress(this._length > 0 ? this._progress : 0, active, animate);
     }
 
     _title() {
@@ -159,34 +153,32 @@ export class MediaProvider extends BarProvider {
             .filter(Boolean).join(' - ');
         if (!text)
             return;
+        const height = smallNotificationHeight(this._settings);
 
         const provider = {
-            createIslandActor: () => this._createTrackTicker(text),
+            createIslandActor: () => this._createTrackTicker(`♪ ${text}`),
             destroyIslandActor() {},
         };
         this.bar.notification(provider, {
             timeout: this._settings.get_int('track-flash-duration'),
             passive: true,
             width: 192,
-            height: 10,
+            height,
             paddingX: 8,
             paddingY: 0,
         });
     }
 
     _createTrackTicker(text) {
+        const height = smallNotificationHeight(this._settings);
         const viewport = new St.Widget({
             style_class: 'dynamic-bar-track-notification',
             layout_manager: new Clutter.BinLayout(),
             clip_to_allocation: true,
             width: 176,
-            height: 10,
+            height,
         });
-        const label = new St.Label({
-            text,
-            style_class: 'dynamic-bar-track-notification-label',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
+        const label = smallNotificationLabel(text, this._settings);
         viewport.add_child(label);
 
         GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
@@ -213,16 +205,15 @@ export class MediaProvider extends BarProvider {
     }
 
     _button(iconName, callback) {
-        const button = new St.Button({
-            style_class: 'dynamic-bar-media-button',
-            can_focus: true,
-            child: new St.Icon({icon_name: iconName, icon_size: 18}),
-        });
-        button.connect('clicked', () => {
+        const names = {
+            'media-skip-backward-symbolic': 'Previous',
+            'media-skip-forward-symbolic': 'Next',
+        };
+        return createIconButton({iconName, tooltip: names[iconName] ?? 'Media action',
+            iconSize: 18, onClicked: () => {
             this.bar.holdOpen(1800);
             callback();
-        });
-        return button;
+        }});
     }
 
     _createCover() {
@@ -240,27 +231,6 @@ export class MediaProvider extends BarProvider {
         } catch {
             return null;
         }
-    }
-
-    _paintProgress(area) {
-        const cr = area.get_context();
-        const [width, height] = area.get_surface_size();
-
-        if (width > 0 && height > 0) {
-            const options = this.bar.presentation.options;
-            drawRoundedRect(cr, 0, 0, width, height, height / 2);
-            cr.setSourceRGBA(1, 1, 1, options.trackAlpha);
-            cr.fill();
-            const progressWidth = width * (this._seekPreview ?? this._progress);
-            if (progressWidth > 0) {
-                drawRoundedRect(cr, 0, 0, progressWidth, height,
-                    Math.min(height / 2, progressWidth / 2));
-                cr.setSourceRGBA(1, 1, 1, options.progressAlpha);
-                cr.fill();
-            }
-        }
-
-        cr.$dispose();
     }
 
     _seekFraction(area, event) {
@@ -295,15 +265,19 @@ export class MediaProvider extends BarProvider {
     }
 
     _createProgress() {
-        const progress = new St.DrawingArea({
+        const options = this.bar.presentation.options;
+        const progress = createProgressBar({
             style_class: this._canSeek
                 ? 'dynamic-bar-media-progress dynamic-bar-media-progress-seekable'
                 : 'dynamic-bar-media-progress',
             reactive: this._canSeek,
-            track_hover: this._canSeek,
+            width: ISLAND_PROGRESS_WIDTH,
+            height: ISLAND_PROGRESS_HEIGHT,
+            trackAlpha: options.trackAlpha,
+            progressAlpha: options.progressAlpha,
+            fillColor: [1, 1, 1],
         });
-        progress.set_height(this._canSeek ? 6 : 4);
-        progress.connect('repaint', () => this._paintProgress(progress));
+        progress.setProgress(this._progress, {animate: false});
         progress.connect('button-press-event', (_actor, event) => {
             if (!this._canSeek || this._seekGrab)
                 return Clutter.EVENT_PROPAGATE;
@@ -322,25 +296,7 @@ export class MediaProvider extends BarProvider {
         return progress;
     }
 
-    _createControlContainer() {
-        this._controlContainer = new IslandControlContainer(this._settings,
-            () => {
-                this.bar.holdOpen(1800);
-                this.bar.refresh();
-            });
-        if (this._launcherProvider) {
-            this._controlContainer.addPage('launcher', () =>
-                this._launcherProvider.createIslandActor());
-        }
-        if (this._liveActivityProvider?.hasActivities) {
-            this._controlContainer.addPage('live-activities', () =>
-                this._liveActivityProvider.createIslandActor());
-        }
-        return this._controlContainer.createActor();
-    }
-
-    _createMarquee(text, styleClass) {
-        const viewport = new St.Widget({
+    _createMarquee(text, styleClass) {        const viewport = new St.Widget({
             style_class: 'dynamic-bar-media-marquee',
             layout_manager: new Clutter.BinLayout(),
             clip_to_allocation: true,
@@ -384,6 +340,10 @@ export class MediaProvider extends BarProvider {
     }
 
     createIslandActor() {
+        return this._createMediaPanel();
+    }
+
+    _createMediaPanel() {
         const box = new St.BoxLayout({
             vertical: true,
             style_class: 'dynamic-bar-media',
@@ -415,20 +375,17 @@ export class MediaProvider extends BarProvider {
         });
         controlButtons.add_child(this._button('media-skip-backward-symbolic',
             () => this._call('Previous')));
-        const playIcon = new St.Icon({
-            icon_name: this._playing
-                ? 'media-playback-pause-symbolic'
-                : 'media-playback-start-symbolic',
-            icon_size: 18,
-        });
-        const playButton = new St.Button({
-            style_class: 'dynamic-bar-media-button',
-            can_focus: true,
-            child: playIcon,
-        });
-        playButton.connect('clicked', () => {
-            this.bar.holdOpen(1800);
-            this._call('PlayPause');
+        const playIconName = this._playing
+            ? 'media-playback-pause-symbolic'
+            : 'media-playback-start-symbolic';
+        const playButton = createIconButton({
+            iconName: playIconName,
+            tooltip: this._playing ? 'Pause' : 'Play',
+            iconSize: 18,
+            onClicked: () => {
+                this.bar.holdOpen(1800);
+                this._call('PlayPause');
+            },
         });
         controlButtons.add_child(playButton);
         controlButtons.add_child(this._button('media-skip-forward-symbolic',
@@ -451,24 +408,26 @@ export class MediaProvider extends BarProvider {
         info.add_child(progress);
         top.add_child(info);
         box.add_child(top);
-        box.add_child(this._createControlContainer());
 
-        this._islandRefs = {title, subtitle, progress, playIcon, source};
+        this._islandRefs = {title, subtitle, progress,
+            playIcon: playButton.child, source};
+        progress.queue_repaint();
         return box;
     }
 
-    destroyIslandActor() {
+    _destroyMediaPanel() {
         this._seekGrab?.dismiss();
         this._seekGrab = null;
         this._seekPreview = null;
-        this._controlContainer?.destroy();
-        this._controlContainer = null;
         this._islandRefs = null;
     }
 
+    destroyIslandActor() {
+        this._destroyMediaPanel();
+    }
+
     _refreshIsland() {
-        const presentation = this.bar.presentation;
-        if (!presentation.expanded || presentation.provider !== this)
+        if (!this.bar.isShown(this))
             return;
         const refs = this._islandRefs;
         if (!refs)
@@ -485,15 +444,14 @@ export class MediaProvider extends BarProvider {
         refs.progress.style_class = this._canSeek
             ? 'dynamic-bar-media-progress dynamic-bar-media-progress-seekable'
             : 'dynamic-bar-media-progress';
-        refs.progress.set_height(this._canSeek ? 6 : 4);
-        refs.progress.queue_repaint();
+        refs.progress.set_height(ISLAND_PROGRESS_HEIGHT);
+        refs.progress.setProgress(this._progress, {animate: true});
         this.bar.refresh();
     }
 
     _updateIslandProgress() {
-        const presentation = this.bar.presentation;
-        if (!presentation.expanded || presentation.provider !== this)
+        if (!this.bar.isShown(this))
             return;
-        this._islandRefs?.progress?.queue_repaint();
+        this._islandRefs?.progress?.setProgress(this._progress, {animate: true});
     }
 }

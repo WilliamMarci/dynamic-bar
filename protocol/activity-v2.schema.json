@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dynamic-bar.local/schema/activity-v2.json",
+  "title": "Dynamic Bar Live Activity v2",
+  "type": "object",
+  "required": ["id", "title"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "title": {"type": "string"},
+    "source": {"type": "string"},
+    "type": {"type": "string"},
+    "group": {"type": "string"},
+    "priority": {"type": "number"},
+    "heartbeatTimeout": {"type": "number", "minimum": 1000},
+    "heartbeat": {"type": "boolean"},
+    "status": {"enum": ["running", "paused", "success", "warning", "error", "cancelled", "orphaned", "expired"]},
+    "summary": {"type": "string"},
+    "logPath": {"type": "string"},
+    "exitCode": {"type": ["integer", "null"]},
+    "expiresAt": {"type": "number", "minimum": 0},
+    "terminalPid": {"type": "integer", "minimum": 0},
+    "silentStart": {"type": "boolean"},
+    "progress": {"$ref": "#/$defs/progress"},
+    "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}}
+  },
+  "$defs": {
+    "progress": {
+      "type": "object", "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["determinate", "indeterminate", "steps", "elapsed"]},
+        "value": {"type": "number", "minimum": 0, "maximum": 1},
+        "current": {"type": "number", "minimum": 0},
+        "total": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "action": {
+      "type": "object", "required": ["id", "label"],
+      "properties": {
+        "id": {"type": "string"}, "label": {"type": "string"},
+        "icon": {"type": "string"}, "kind": {"const": "callback"},
+        "dangerous": {"type": "boolean"}
+      }
+    }
+  }
+}

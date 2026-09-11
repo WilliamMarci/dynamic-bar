@@ -78,6 +78,8 @@ export class BluetoothProvider extends BarProvider {
         this.pushNotification({
             timeout: this._settings.get_int('notification-decay'),
             passive: true,
+            paddingX: 16,
+            paddingY: 10,
         });
     }
 

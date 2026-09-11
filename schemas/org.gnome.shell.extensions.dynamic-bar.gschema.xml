@@ -14,7 +14,7 @@
       <description>Width of the dynamic bar in pixels.</description>
     </key>
     <key name="bar-long-width" type="i">
-      <default>144</default>
+      <default>108</default>
       <summary>Dynamic bar active width</summary>
       <description>Width of the dynamic bar while hovered or expanded, in pixels.</description>
     </key>
@@ -125,6 +125,71 @@
       <summary>Track flash duration</summary>
       <description>How long the music note indicator stays visible on track changes, in milliseconds.</description>
     </key>
+    <key name="activity-dot-size" type="i">
+      <default>0</default>
+      <summary>Activity dot size</summary>
+      <description>Diameter of the activity dot in pixels. 0 matches the dynamic bar height.</description>
+    </key>
+    <key name="activity-dot-hit-size" type="i">
+      <default>8</default>
+      <summary>Activity dot hit area</summary>
+      <description>Reactive area around an activity dot used for near-hover growth, in pixels.</description>
+    </key>
+    <key name="activity-dot-hover-scale" type="d">
+      <default>1.6</default>
+      <summary>Activity dot hover scale</summary>
+      <description>Scale applied to an activity dot after the pointer lingers nearby.</description>
+    </key>
+    <key name="activity-dot-border-width" type="i">
+      <default>1</default>
+      <summary>Activity dot border width</summary>
+      <description>Width of the outer ring on completed activity dots, in pixels.</description>
+    </key>
+    <key name="activity-running-color" type="s">
+      <default>'#ff9f0a'</default>
+      <summary>Running activity color</summary>
+      <description>Color of running activity dots and progress fills.</description>
+    </key>
+    <key name="activity-success-color" type="s">
+      <default>'#33d17a'</default>
+      <summary>Success activity color</summary>
+      <description>Color of completed activity dots and progress fills.</description>
+    </key>
+    <key name="activity-paused-color" type="s">
+      <default>'#77767b'</default>
+      <summary>Paused activity color</summary>
+      <description>Color of paused activity dots and progress fills.</description>
+    </key>
+    <key name="activity-warning-color" type="s">
+      <default>'#f6d32d'</default>
+      <summary>Warning activity color</summary>
+      <description>Color of warning and orphaned activity dots and progress fills.</description>
+    </key>
+    <key name="activity-error-color" type="s">
+      <default>'#e01b24'</default>
+      <summary>Error activity color</summary>
+      <description>Color of error and cancelled activity dots and progress fills.</description>
+    </key>
+    <key name="small-notification-height" type="i">
+      <default>10</default>
+      <summary>Small notification height</summary>
+      <description>Height of the low-profile small notifications in pixels.</description>
+    </key>
+    <key name="small-notification-font-size" type="i">
+      <default>8</default>
+      <summary>Small notification font size</summary>
+      <description>Font size of the small notification label in pixels.</description>
+    </key>
+    <key name="removable-mounted-color" type="s">
+      <default>'#3584e4'</default>
+      <summary>Mounted volume ring color</summary>
+      <description>Outer ring color for a readable mounted volume activity dot.</description>
+    </key>
+    <key name="removable-unmounted-color" type="s">
+      <default>'#33d17a'</default>
+      <summary>Unmounted volume ring color</summary>
+      <description>Outer ring color for a removed or unreadable volume activity dot.</description>
+    </key>
     <key name="animations-enabled" type="b">
       <default>true</default>
       <summary>Popup animations</summary>
@@ -160,6 +225,11 @@
       <default>[]</default>
       <summary>Ignored notification applications</summary>
       <description>Application IDs excluded from notification forwarding.</description>
+    </key>
+    <key name="printing-enabled" type="b">
+      <default>true</default>
+      <summary>Printing activities</summary>
+      <description>Show visible CUPS print jobs and printer problems.</description>
     </key>
     <key name="bluetooth-enabled" type="b">
       <default>true</default>

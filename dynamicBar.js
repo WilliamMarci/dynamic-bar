@@ -1,3 +1,4 @@
+import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -7,12 +8,13 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {BarBackground, IslandBackground} from './barBackground.js';
 import {DynamicBarApi} from './api.js';
+import {IslandCardDeck} from './cardDeck.js';
 import {findPanelStyleActor, readPanelColor,
     readPanelTransitionDuration} from './panelStyle.js';
 
 export const DEFAULTS = {
     barWidth: 72,
-    barLongWidth: 144,
+    barLongWidth: 108,
     barHeight: 4,
     barRadius: 2,
     barGap: 2,
@@ -32,6 +34,15 @@ export const DEFAULTS = {
     notificationDecay: 2500,
     trackFlashDuration: 1200,
     animationsEnabled: true,
+    activityDotSize: 0,
+    activityDotHitSize: 8,
+    activityDotHoverScale: 1.6,
+    activityDotBorderWidth: 1,
+    activityRunningColor: '#ff9f0a',
+    activitySuccessColor: '#33d17a',
+    activityPausedColor: '#77767b',
+    activityWarningColor: '#f6d32d',
+    activityErrorColor: '#e01b24',
 };
 
 const ZONE_SIZE = 20;
@@ -76,6 +87,8 @@ export const DynamicBar = GObject.registerClass({
         this._indicators = new Map();
         this._activities = new Map();
         this._activityPreviewTimerId = 0;
+        this._activityHovered = false;
+        this._activityPinnedId = null;
         this._progress = 0;
         this._progressActive = false;
         this._islandWidth = 0;
@@ -85,6 +98,18 @@ export const DynamicBar = GObject.registerClass({
         this._initialLayoutId = 0;
         this._interactionTimerId = 0;
         this._layoutReady = false;
+        this._islandAnimating = false;
+        this._providers = [];
+        this._deck = null;
+        this._deckCardOwners = new Map();
+        this._deckActiveId = null;
+        this._deckAttachedExpanded = false;
+        this._attachedOwner = null;
+        this._deckProvider = {
+            getLayoutOptions: () => this._deckLayoutOptions(),
+            createIslandActor: () => this._createDeckActor(),
+            destroyIslandActor: () => this._destroyDeck(),
+        };
 
         this._actor = new St.Widget({
             name: 'dynamicBar',
@@ -103,6 +128,7 @@ export const DynamicBar = GObject.registerClass({
 
         this._islandHolder = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
+            clip_to_allocation: true,
         });
         this._actor.add_child(this._islandHolder);
 
@@ -127,8 +153,10 @@ export const DynamicBar = GObject.registerClass({
 
         this._island.connectObject(
             'notify::hover', () => this._onHoverChanged(),
-            'notify::allocation', () => this._syncIslandHolder(),
-            'notify::translation-y', () => this._syncIslandHolder(),
+            'notify::allocation', () => {
+                this._island.queue_repaint();
+                this._syncIslandHolder();
+            },
             this);
         this._bar.connectObject(
             'notify::hover', () => this._onHoverChanged(),
@@ -203,16 +231,155 @@ export const DynamicBar = GObject.registerClass({
         this._liveActivityProvider = provider;
     }
 
+    /** Register a provider that can contribute cards or an attached page. */
+    registerProvider(provider) {
+        if (provider && !this._providers.includes(provider))
+            this._providers.push(provider);
+    }
+
     openPreferences() {
         this._openPreferences?.();
     }
 
+    _collectCardSpecs() {
+        const cards = [];
+        for (const provider of this._providers) {
+            let list = [];
+            try {
+                list = provider.getCards?.() ?? [];
+            } catch (error) {
+                console.error(`Dynamic Bar provider cards failed: ${error}`);
+                continue;
+            }
+            for (const card of list) {
+                if (!card?.id || typeof card.createActor !== 'function')
+                    continue;
+                cards.push({owner: provider, ...card});
+            }
+        }
+        return cards;
+    }
+
+    _attachedSpec() {
+        for (const provider of this._providers) {
+            const page = provider.getAttachedPage?.();
+            if (page?.id && typeof page.createActor === 'function')
+                return {owner: provider, ...page};
+        }
+        return null;
+    }
+
+    _deckLayoutOptions() {
+        const specs = this._collectCardSpecs();
+        if (!specs.length)
+            return {};
+        const active = specs.find(spec => spec.id === this._deckActiveId) ?? specs[0];
+        const layout = active.layout ?? active.owner?.getLayoutOptions?.() ?? {};
+        return {
+            paddingX: 0,
+            paddingY: Math.max(layout.paddingY ?? 10,
+                this._deckAttachedExpanded ? 10 : 0),
+            minWidth: layout.minWidth,
+            minHeight: layout.minHeight,
+        };
+    }
+
+    _createDeckActor() {
+        const specs = this._collectCardSpecs();
+        if (!specs.length)
+            return null;
+        console.log(`[Dynamic Bar] deck cards: ${specs.map(spec => spec.id).join(', ')}`);
+        const attached = this._attachedSpec();
+        const deck = new IslandCardDeck(this._settings, {
+            onLayoutChanged: () => this.refreshIslandSize(),
+            onInteraction: () => this.holdOpen(1800),
+            onCardSelected: id => {
+                this._deckActiveId = id;
+            },
+            onAttachedToggled: expanded => {
+                this._deckAttachedExpanded = expanded;
+            },
+        });
+        const owners = new Map();
+        for (const spec of specs) {
+            owners.set(spec.id, spec.owner);
+            deck.addCard({
+                id: spec.id,
+                layout: spec.layout ?? spec.owner?.getLayoutOptions?.() ?? {},
+                createActor: () => spec.createActor(),
+                onDestroy: () => spec.onDestroy?.(),
+            });
+        }
+        if (attached) {
+            deck.setAttached({
+                id: attached.id,
+                layout: attached.layout ??
+                    attached.owner?.getLayoutOptions?.() ?? {},
+                createActor: () => attached.createActor(),
+                onDestroy: () => attached.onDestroy?.(),
+            });
+        }
+        const active = specs.some(spec => spec.id === this._deckActiveId)
+            ? this._deckActiveId
+            : specs[0].id;
+        deck.selectCard(active);
+        this._deck = deck;
+        this._deckCardOwners = owners;
+        this._attachedOwner = attached?.owner ?? null;
+        const actor = deck.createActor();
+        if (attached && this._deckAttachedExpanded)
+            deck.toggleAttached();
+        return actor;
+    }
+
+    _destroyDeck() {
+        this._deck?.destroy();
+        this._deck = null;
+        this._deckCardOwners = new Map();
+        this._attachedOwner = null;
+    }
+
+    isProviderShown(provider) {
+        if (this._destroyed || !this._expanded)
+            return false;
+        if (this._contentProvider === provider)
+            return true;
+        if (this._deck) {
+            if (this._attachedOwner === provider)
+                return true;
+            if (this._deckCardOwners.get(this._deck.activeId) === provider)
+                return true;
+        }
+        return false;
+    }
+
+    /** Rebuild the deck after providers add/remove cards. */
+    cardsChanged() {
+        if (this._destroyed || !this._expanded || this._notification)
+            return;
+        const specs = this._collectCardSpecs();
+        if (!specs.length) {
+            this._setIslandContent(this._defaultProvider);
+            this._syncLayout();
+            return;
+        }
+        this._setIslandContent(this._deckProvider);
+        this._syncLayout();
+    }
+
+    /** Remember the desired card and switch to it if the deck exists. */
+    focusCard(id) {
+        if (!id)
+            return;
+        this._deckActiveId = id;
+        if (this._deck && this._deck.activeId !== id)
+            this._deck.selectCard(id);
+    }
+
     expandPrimary() {
-        const provider = this._mediaProvider?.isAvailable
-            ? this._mediaProvider
-            : this._liveActivityProvider?.hasActivities
-                ? this._liveActivityProvider
-                : this._defaultProvider;
+        const provider = this._collectCardSpecs().length
+            ? this._deckProvider
+            : this._defaultProvider;
         if (!provider)
             return;
         if (!this.expandWith(provider) && provider !== this._defaultProvider)
@@ -356,54 +523,278 @@ export const DynamicBar = GObject.registerClass({
             });
     }
 
-    setBarProgress(progress, active) {
+    setBarProgress(progress, active, animate = false) {
         if (this._destroyed || !this._bar)
             return;
         this._progress = progress;
         this._progressActive = active;
-        this._syncBarPaint();
+        this._syncBarPaint(animate);
     }
 
-    setProgress(progress, active = true) {
-        this.setBarProgress(progress, active);
+    setProgress(progress, active = true, animate = false) {
+        this.setBarProgress(progress, active, animate);
     }
 
     setStatus(id, actor) {
         this.setRightIndicator(id, actor);
     }
 
+    _activityDotColor(status) {
+        const options = this._options;
+        switch (status) {
+        case 'success': return options.activitySuccessColor;
+        case 'paused': return options.activityPausedColor;
+        case 'warning':
+        case 'orphaned': return options.activityWarningColor;
+        case 'error':
+        case 'cancelled': return options.activityErrorColor;
+        default: return options.activityRunningColor;
+        }
+    }
+
     setActivity(id, activity) {
-        if (activity)
+        if (activity) {
             this._activities.set(id, activity === true ? {} : activity);
-        else
+        } else {
+            if (this._activityPinnedId === id) {
+                this._activityPinnedId = null;
+                this._bar.clearActivityPreview();
+            }
             this._activities.delete(id);
+        }
+        this._rebuildDots();
+    }
+
+    _parseColor(value) {
+        const text = String(value ?? '').trim();
+        let match = text.match(/^#([0-9a-f]{6})$/i);
+        if (match) {
+            const hex = match[1];
+            return [
+                parseInt(hex.slice(0, 2), 16) / 255,
+                parseInt(hex.slice(2, 4), 16) / 255,
+                parseInt(hex.slice(4, 6), 16) / 255,
+            ];
+        }
+        match = text.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+        if (match)
+            return [Number(match[1]) / 255, Number(match[2]) / 255,
+                Number(match[3]) / 255];
+        try {
+            const color = Clutter.Color.from_string(text);
+            return color
+                ? [color.red / 255, color.green / 255, color.blue / 255]
+                : null;
+        } catch {
+            return null;
+        }
+    }
+
+    _makeTriangle(color) {
+        const area = new St.DrawingArea();
+        area.set_size(10, 6);
+        area._color = color ?? [0.95, 0.95, 0.95];
+        const draw = () => {
+            const cr = area.get_context();
+            const [width, height] = area.get_surface_size();
+            // Soft drop shadow, then the white pointer aimed up at the dot.
+            cr.setSourceRGBA(0, 0, 0, 0.30);
+            cr.moveTo(1, height - 1);
+            cr.lineTo(width - 1, height - 1);
+            cr.lineTo(width / 2, 1.5);
+            cr.closePath();
+            cr.fill();
+            cr.setSourceRGBA(area._color[0], area._color[1], area._color[2], 0.98);
+            cr.moveTo(2, height);
+            cr.lineTo(width - 2, height);
+            cr.lineTo(width / 2, 2.5);
+            cr.closePath();
+            cr.fill();
+            cr.$dispose();
+        };
+        area.connect('repaint', draw);
+        area.connect('notify::allocation', () => area.queue_repaint());
+        GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            area.queue_repaint();
+            return GLib.SOURCE_REMOVE;
+        });
+        return area;
+    }
+
+    _rebuildDots() {
         this._activityBox.remove_all_children();
+
+        const options = this._options;
+        const size = Math.max(2, options.activityDotSize || options.barHeight);
+        const border = Math.max(0, options.activityDotBorderWidth);
+        const ringSize = size + border * 2;
+        const hitSize = Math.max(options.activityDotHitSize, ringSize + 4, size + 6);
+
         for (const [activityId, state] of this._activities) {
-            const dot = new St.Button({
-                style_class: `dynamic-bar-activity-dot ${state.status ??
-                    (state.completed ? 'success' : 'running')}`,
-                width: this._options.barHeight,
-                height: this._options.barHeight,
+            const status = state.status ?? (state.completed ? 'success' : 'running');
+            const color = this._activityDotColor(status);
+
+            const holder = new St.Widget({
+                layout_manager: new Clutter.BinLayout(),
+                width: hitSize,
+                height: hitSize,
+                reactive: true,
+                track_hover: true,
                 can_focus: true,
+                y_align: Clutter.ActorAlign.CENTER,
             });
-            dot.connect('clicked', () => {
+
+            const visual = new St.Widget({
+                layout_manager: new Clutter.BinLayout(),
+                width: ringSize,
+                height: ringSize,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            visual.set_pivot_point(0.5, 0.5);
+
+            const hoverRing = new St.Widget({
+                style_class: 'dynamic-bar-activity-hover-ring',
+                width: ringSize + 6,
+                height: ringSize + 6,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
+                visible: false,
+            });
+            visual.add_child(hoverRing);
+
+            const ringColor = typeof state.ring === 'string'
+                ? state.ring
+                : (status === 'success' ? 'rgba(255, 255, 255, 0.95)' : null);
+            const ring = new St.Widget({
+                style_class: 'dynamic-bar-activity-ring',
+                width: ringSize,
+                height: ringSize,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
+                visible: border > 0 && Boolean(ringColor),
+            });
+            ring.set_style(`background-color: ${ringColor ?? 'transparent'};`);
+            visual.add_child(ring);
+
+            const dot = new St.Widget({
+                style_class: 'dynamic-bar-activity-dot',
+                width: size,
+                height: size,
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.CENTER,
+            });
+            dot.set_style(`background-color: ${color};`);
+            visual.add_child(dot);
+
+            holder.add_child(visual);
+
+            if (this._activityPinnedId === activityId) {
+                const triangle = this._makeTriangle(this._parseColor(color));
+                triangle.x_align = Clutter.ActorAlign.CENTER;
+                triangle.y_align = Clutter.ActorAlign.START;
+                triangle.translation_y = size + 2;
+                holder.add_child(triangle);
+            }
+
+            let hoverTimerId = 0;
+            const setHovered = hovered => {
+                if (hoverTimerId) {
+                    GLib.source_remove(hoverTimerId);
+                    hoverTimerId = 0;
+                }
+                if (hovered) {
+                    // Linger nearby for a moment before growing the target.
+                    hoverTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 320,
+                        () => {
+                            hoverTimerId = 0;
+                            if (!holder.hover)
+                                return GLib.SOURCE_REMOVE;
+                            hoverRing.visible = true;
+                            const preview = Number.isFinite(state.progress)
+                                ? state.progress : 0.35;
+                            this.previewActivityProgress(preview, color);
+                            visual.ease({
+                                scale_x: options.activityDotHoverScale,
+                                scale_y: options.activityDotHoverScale,
+                                duration: 160,
+                                mode: Clutter.AnimationMode.EASE_OUT_BACK,
+                            });
+                            return GLib.SOURCE_REMOVE;
+                        });
+                } else {
+                    hoverRing.visible = false;
+                    visual.ease({
+                        scale_x: 1,
+                        scale_y: 1,
+                        duration: 140,
+                        mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+                    });
+                }
+            };
+            holder.connect('notify::hover', () => {
+                this._activityHovered = this._activityBox.get_children()
+                    .some(child => child.hover);
+                setHovered(holder.hover);
+            });
+            holder.connect('button-press-event', (_actor, event) => {
+                const shift = (event.get_state() &
+                    Clutter.ModifierType.SHIFT_MASK) !== 0;
+                if (shift) {
+                    this.toggleActivityPin(activityId, state);
+                    return Clutter.EVENT_STOP;
+                }
                 if (Number.isFinite(state.progress))
-                    this.previewActivityProgress(state.progress);
+                    this.previewActivityProgress(state.progress, color);
                 state.onClick?.(activityId);
+                this.expandPrimary();
+                return Clutter.EVENT_STOP;
             });
-            this._activityBox.add_child(dot);
+            this._activityBox.add_child(holder);
         }
         this._syncLayout();
     }
 
-    previewActivityProgress(progress) {
+    toggleActivityPin(id, state) {
+        if (this._activityPinnedId === id) {
+            this._activityPinnedId = null;
+            this._bar.clearActivityPreview();
+            this._syncBarPaint();
+        } else {
+            this._activityPinnedId = id;
+            const value = Number.isFinite(state.progress) ? state.progress : 0.35;
+            this._bar.setPinnedActivityPreview(value, {
+                color: this._parseColor(this._activityDotColor(
+                    state.status ?? 'running')),
+                striped: true,
+            });
+        }
+        this._rebuildDots();
+    }
+
+    previewActivityProgress(progress, color = null) {
         if (this._activityPreviewTimerId)
             GLib.source_remove(this._activityPreviewTimerId);
-        this._bar.setActivityPreview(progress);
+        this._bar.setActivityPreview(progress, {
+            color: this._parseColor(color),
+            striped: true,
+        });
+        // Keep previewing while the pointer lingers on the activity dots.
+        const tick = () => {
+            this._activityPreviewTimerId = 0;
+            if (this._activityHovered) {
+                this._activityPreviewTimerId = GLib.timeout_add(
+                    GLib.PRIORITY_DEFAULT, 1800, () => {
+                        tick();
+                        return GLib.SOURCE_REMOVE;
+                    });
+                return;
+            }
+            this._syncBarPaint();
+        };
         this._activityPreviewTimerId = GLib.timeout_add(
             GLib.PRIORITY_DEFAULT, 1800, () => {
-                this._activityPreviewTimerId = 0;
-                this._syncBarPaint();
+                tick();
                 return GLib.SOURCE_REMOVE;
             });
     }
@@ -478,6 +869,7 @@ export const DynamicBar = GObject.registerClass({
     refreshIslandSize() {
         if (this._destroyed || !this._expanded)
             return;
+        this._providerLayout = this._contentProvider?.getLayoutOptions?.() ?? null;
         this._syncIslandSize();
         this._syncRootGeometry();
         this._syncIslandGeometry();
@@ -803,6 +1195,22 @@ export const DynamicBar = GObject.registerClass({
             trackFlashDuration: read('track-flash-duration', DEFAULTS.trackFlashDuration),
             animationsEnabled: readBoolean('animations-enabled',
                 DEFAULTS.animationsEnabled),
+            activityDotSize: read('activity-dot-size', DEFAULTS.activityDotSize),
+            activityDotHitSize: read('activity-dot-hit-size', DEFAULTS.activityDotHitSize),
+            activityDotHoverScale: read('activity-dot-hover-scale',
+                DEFAULTS.activityDotHoverScale, 'd'),
+            activityDotBorderWidth: read('activity-dot-border-width',
+                DEFAULTS.activityDotBorderWidth),
+            activityRunningColor: settings?.get_string('activity-running-color') ??
+                DEFAULTS.activityRunningColor,
+            activitySuccessColor: settings?.get_string('activity-success-color') ??
+                DEFAULTS.activitySuccessColor,
+            activityPausedColor: settings?.get_string('activity-paused-color') ??
+                DEFAULTS.activityPausedColor,
+            activityWarningColor: settings?.get_string('activity-warning-color') ??
+                DEFAULTS.activityWarningColor,
+            activityErrorColor: settings?.get_string('activity-error-color') ??
+                DEFAULTS.activityErrorColor,
         };
 
         if (!this._island)
@@ -819,11 +1227,15 @@ export const DynamicBar = GObject.registerClass({
         this._syncBarPaint();
     }
 
-    _syncBarPaint() {
+    _syncBarPaint(animate = false) {
         if (!this._bar)
             return;
-        this._bar.setProgress(this._progress,
-            this._progressActive && (!this._expanded || this._passiveExpanded));
+        // Expanded islands show the plain long bar; progress is only painted
+        // in the collapsed (or passively expanded) state. The transition into
+        // that state is animated by BarBackground.
+        const active = this._progressActive &&
+            (!this._expanded || this._passiveExpanded);
+        this._bar.setProgress(this._progress, active, animate);
     }
 
     _setIslandContent(provider) {
@@ -922,9 +1334,14 @@ export const DynamicBar = GObject.registerClass({
             (sideWidth + ZONE_GAP) * 2;
         // A thin bar needs space on both sides of its center for indicators.
         // Start the root above the panel edge by the required upper half.
-        const topInset = this._expanded
-            ? Math.max(0, Math.ceil((ZONE_SIZE - options.barHeight) / 2))
-            : 0;
+        // While the island animates, keep the current inset so the panel
+        // anchor and the bar target stay stable; the inset is recomputed when
+        // the animation settles.
+        const topInset = this._islandAnimating
+            ? this._topInset ?? 0
+            : this._expanded
+                ? Math.max(0, Math.ceil((ZONE_SIZE - options.barHeight) / 2))
+                : 0;
         const barAndZoneTail = Math.ceil(
             (options.barHeight + Math.max(options.barHeight, ZONE_SIZE)) / 2);
         const rootHeight = topInset + this._islandHeight + options.barGap +
@@ -948,10 +1365,14 @@ export const DynamicBar = GObject.registerClass({
         const topInset = this._topInset ?? 0;
         const x = Math.round((this._rootWidth - this._islandWidth) / 2);
         this._island.set_position(x, topInset);
-        this._island.set_size(this._islandWidth, this._islandHeight);
-        this._island.translation_y = this._expanded
-            ? 0
-            : -(this._islandHeight + topInset);
+        this._island.translation_y = 0;
+        if (this._islandAnimating) {
+            // Height is owned by the running animation; only track width.
+            this._island.set_width(this._islandWidth);
+        } else {
+            this._island.set_size(this._islandWidth,
+                this._expanded ? this._islandHeight : 0);
+        }
         this._syncIslandHolder();
     }
 
@@ -961,13 +1382,18 @@ export const DynamicBar = GObject.registerClass({
         const [x, y] = this._island.get_position();
         this._islandHolder.set_position(x, y);
         this._islandHolder.set_size(this._island.width, this._island.height);
-        this._islandHolder.translation_y = this._island.translation_y;
         this._islandHolder.queue_relayout();
     }
 
     _syncBarGeometry() {
         if (!this._bar)
             return;
+        if (this._islandAnimating) {
+            // The bar follows the island bottom edge through the animation;
+            // do not snap it to the final geometry mid-flight.
+            this._syncBarDependents();
+            return;
+        }
         const options = this._options;
         const width = this._expanded
             ? (this._passiveExpanded
@@ -991,16 +1417,21 @@ export const DynamicBar = GObject.registerClass({
         const barWidth = this._bar.width;
         const barHeight = this._bar.height;
         const sideWidth = this._sideWidth ?? ZONE_SIZE;
-        const zoneSize = this._expanded ? ZONE_SIZE : barHeight;
-        const centeredY = Math.round(barY + (barHeight - zoneSize) / 2);
-        const zoneY = Math.max(0,
-            Math.min(centeredY, this._rootHeight - zoneSize));
+        const leftSize = this._expanded
+            ? ZONE_SIZE
+            : Math.max(barHeight, this._options.activityDotHitSize);
+        const rightSize = this._expanded ? ZONE_SIZE : barHeight;
+        const centerFor = size => Math.round(barY + (barHeight - size) / 2);
+        const leftY = Math.max(0, Math.min(centerFor(leftSize),
+            this._rootHeight - leftSize));
+        const rightY = Math.max(0, Math.min(centerFor(rightSize),
+            this._rootHeight - rightSize));
 
         this._leftZone.set_position(
-            Math.round(barX - ZONE_GAP - sideWidth), zoneY);
-        this._leftZone.set_size(sideWidth, zoneSize);
-        this._rightZone.set_position(Math.round(barX + barWidth + ZONE_GAP), zoneY);
-        this._rightZone.set_size(sideWidth, zoneSize);
+            Math.round(barX - ZONE_GAP - sideWidth), leftY);
+        this._leftZone.set_size(sideWidth, leftSize);
+        this._rightZone.set_position(Math.round(barX + barWidth + ZONE_GAP), rightY);
+        this._rightZone.set_size(sideWidth, rightSize);
     }
 
     _syncLayout() {
@@ -1037,7 +1468,6 @@ export const DynamicBar = GObject.registerClass({
             ? options.barLongWidth
             : options.barWidth;
         const collapsedBarY = (this._topInset ?? 0) + options.barGap;
-        const hiddenIslandY = -(this._islandHeight + (this._topInset ?? 0));
         const barY = collapsedBarY + (expanded ? this._islandHeight : 0);
         const barX = Math.round((this._rootWidth - barWidth) / 2);
 
@@ -1047,63 +1477,135 @@ export const DynamicBar = GObject.registerClass({
         this._syncStatusScale(true, duration);
 
         if (expanded) {
+            // The island grows downward from the panel edge: its top edge is
+            // pinned and only the height changes, so background and content
+            // stay in sync through the holder allocation.
+            this._island.set_position(
+                Math.round((this._rootWidth - this._islandWidth) / 2),
+                this._topInset ?? 0);
+            this._island.set_width(this._islandWidth);
+            if (duration <= 0) {
+                this._islandAnimating = false;
+                this._island.set_height(this._islandHeight);
+                this._syncIslandHolder();
+                this._bar.set_position(barX, barY);
+                this._bar.set_size(barWidth, options.barHeight);
+                this._syncBarDependents();
+                this._syncBarPaint();
+                return;
+            }
+            if (fromCollapsed) {
+                // Start exactly where the collapsed bar was on screen, then
+                // let it follow the growing island's bottom edge.
+                this._island.set_height(0);
+                const startWidth = this._hovered
+                    ? options.barLongWidth
+                    : options.barWidth;
+                this._bar.set_position(
+                    Math.round((this._rootWidth - startWidth) / 2),
+                    collapsedBarY);
+                this._bar.set_size(startWidth, options.barHeight);
+            }
+            this._animateIslandHeight(this._islandHeight, duration, mode);
             this._bar.ease({x: barX, width: barWidth, y: barY, duration, mode});
-            if (fromCollapsed)
-                this._island.translation_y = hiddenIslandY;
-            this._island.ease({translation_y: 0, duration, mode});
-        } else {
-            // Phase 1 only retracts vertically. Preserve the exact horizontal
-            // geometry already visible instead of forcing a configured width.
-            this._bar.ease({
-                y: collapsedBarY,
-                duration,
-                mode,
-            });
-            this._island.ease({
-                translation_y: hiddenIslandY,
-                duration,
-                mode,
-                onComplete: () => {
-                    if (this._destroyed || this._expanded)
-                        return;
-                    const [stageBarX] = this._bar.get_transformed_position();
-                    const phaseOneWidth = this._bar.width;
-                    this._clearIslandContent();
-                    this._contentSize = null;
+            return;
+        }
+
+        // Phase 1 retracts the island in place with its top edge pinned to the
+        // panel. The bar keeps the exact horizontal geometry already visible
+        // and only follows the island's bottom edge upward.
+        if (duration <= 0) {
+            this._islandAnimating = false;
+            this._island.set_height(0);
+            this._syncIslandHolder();
+            this._bar.set_position(this._bar.x, collapsedBarY);
+            this._finishCollapse(duration, mode);
+            return;
+        }
+        this._animateIslandHeight(0, duration, mode,
+            () => this._finishCollapse(duration, mode));
+        this._bar.ease({y: collapsedBarY, duration, mode});
+    }
+
+    _animateIslandHeight(height, duration, mode, onComplete = null) {
+        if (!this._island)
+            return;
+        if (duration <= 0) {
+            this._islandAnimating = false;
+            this._island.set_height(height);
+            this._syncIslandHolder();
+            onComplete?.();
+            return;
+        }
+        this._islandAnimating = true;
+        this._island.ease({
+            height,
+            duration,
+            mode,
+            onComplete: () => {
+                if (!this._island)
+                    return;
+                this._islandAnimating = false;
+                this._island.set_height(height);
+                this._syncIslandHolder();
+                onComplete?.();
+                // Content may have been re-measured while growing; settle on
+                // the latest natural size instead of the stale target.
+                if (this._expanded &&
+                    Math.abs(this._islandHeight - height) > 0.5) {
                     this._syncIslandSize();
                     this._syncRootGeometry();
                     this._syncIslandGeometry();
+                    this._syncBarGeometry();
+                }
+            },
+        });
+    }
 
-                    // Root width may change after removing provider content.
-                    // Restore the phase-one bar in stage coordinates first.
-                    const phaseOneX = Math.round(stageBarX - this._rootX);
-                    const finalBarY = (this._topInset ?? 0) + options.barGap;
-                    this._bar.set_position(phaseOneX, finalBarY);
-                    this._bar.set_size(phaseOneWidth, options.barHeight);
+    _finishCollapse(duration, mode) {
+        if (this._destroyed || this._expanded || !this._bar)
+            return;
+        const options = this._options;
+        const [stageBarX] = this._bar.get_transformed_position();
+        const phaseOneWidth = this._bar.width;
+        this._clearIslandContent();
+        this._contentSize = null;
+        this._syncIslandSize();
+        this._syncRootGeometry();
+        this._syncIslandGeometry();
 
-                    // Phase 2 decides from the current collapsed state whether
-                    // the bar actually needs to change width.
-                    const targetWidth = this._hovered
-                        ? options.barLongWidth
-                        : options.barWidth;
-                    const targetX = Math.round(
-                        (this._rootWidth - targetWidth) / 2);
-                    this._bar.ease({
-                        x: targetX,
-                        width: targetWidth,
-                        y: finalBarY,
-                        duration,
-                        mode,
-                        onComplete: () => {
-                            if (this._destroyed || this._expanded)
-                                return;
-                            this._bar.set_position(targetX, finalBarY);
-                            this._bar.set_size(targetWidth, options.barHeight);
-                            this._syncBarDependents();
-                        },
-                    });
-                },
-            });
+        // Root width may change after removing provider content. Restore the
+        // phase-one bar in stage coordinates first.
+        const phaseOneX = Math.round(stageBarX - this._rootX);
+        const finalBarY = (this._topInset ?? 0) + options.barGap;
+        this._bar.set_position(phaseOneX, finalBarY);
+        this._bar.set_size(phaseOneWidth, options.barHeight);
+
+        // Phase 2 decides from the current collapsed state whether the bar
+        // actually needs to change width, then animates to the exact
+        // center-positioned final geometry.
+        const targetWidth = this._hovered
+            ? options.barLongWidth
+            : options.barWidth;
+        const targetX = Math.round((this._rootWidth - targetWidth) / 2);
+        const finish = () => {
+            if (this._destroyed || this._expanded || !this._bar)
+                return;
+            this._bar.set_position(targetX, finalBarY);
+            this._bar.set_size(targetWidth, options.barHeight);
+            this._syncBarDependents();
+        };
+        if (duration <= 0) {
+            finish();
+            return;
         }
+        this._bar.ease({
+            x: targetX,
+            width: targetWidth,
+            y: finalBarY,
+            duration,
+            mode,
+            onComplete: finish,
+        });
     }
 });

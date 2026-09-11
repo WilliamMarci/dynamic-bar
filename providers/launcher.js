@@ -15,13 +15,20 @@ export class LauncherProvider extends BarProvider {
     }
 
     _refreshVisible() {
-        const presentation = this.bar.presentation;
-        if (presentation.expanded && presentation.provider === this)
-            this.bar.rebuild(this);
+        if (this.bar.isShown(this))
+            this.bar.cardsChanged();
     }
 
     getLayoutOptions() {
         return {paddingX: 16, paddingY: 10};
+    }
+
+    getAttachedPage() {
+        return {
+            id: 'launcher',
+            createActor: () => this.createIslandActor(),
+            onDestroy: () => this.destroyIslandActor?.(),
+        };
     }
 
     createIslandActor() {

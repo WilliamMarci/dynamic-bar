@@ -1,0 +1,17 @@
+<node>
+  <interface name="org.gnome.Shell.Extensions.DynamicBar.LiveActivity">
+    <method name="GetCapabilities"><arg name="version" type="u" direction="out"/><arg name="capabilities" type="as" direction="out"/></method>
+    <method name="StartV2"><arg name="activity" type="s" direction="in"/></method>
+    <method name="UpdateV2"><arg name="id" type="s" direction="in"/><arg name="update" type="s" direction="in"/></method>
+    <method name="FinishV2"><arg name="id" type="s" direction="in"/><arg name="result" type="s" direction="in"/></method>
+    <method name="Heartbeat"><arg name="id" type="s" direction="in"/></method>
+    <method name="Dismiss"><arg name="id" type="s" direction="in"/></method>
+    <method name="Inspect"><arg name="activities" type="s" direction="out"/></method>
+    <method name="Timer"><arg name="id" type="s" direction="in"/><arg name="title" type="s" direction="in"/><arg name="seconds" type="u" direction="in"/></method>
+    <signal name="ActionRequested"><arg name="activityId" type="s"/><arg name="actionId" type="s"/></signal>
+    <!-- v1 compatibility -->
+    <method name="Start"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="u" direction="in"/></method>
+    <method name="Update"><arg type="s" direction="in"/><arg type="d" direction="in"/></method>
+    <method name="Complete"><arg type="s" direction="in"/><arg type="i" direction="in"/></method>
+  </interface>
+</node>

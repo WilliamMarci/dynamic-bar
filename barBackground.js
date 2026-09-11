@@ -144,9 +144,15 @@ class BarBackground extends St.DrawingArea {
         this._elapsed = 0;
         this._duration = 0;
         this._tickId = 0;
+        this._activityStriped = false;
+        this._stripePhase = 0;
+        this._stripeTickId = 0;
 
         this.connect('repaint', () => this._paint());
-        this.connect('destroy', () => this._stopTick());
+        this.connect('destroy', () => {
+            this._stopTick();
+            this._stopStripeTick();
+        });
     }
 
     setRadius(radius) {
@@ -171,16 +177,48 @@ class BarBackground extends St.DrawingArea {
         this.queue_repaint();
     }
 
-    setProgress(progress, active) {
+    setProgress(progress, active, animate = false) {
+        const target = Math.min(Math.max(progress, 0), 1);
+        this._activityStriped = false;
+        this._stopStripeTick();
         if (this._glowActive) {
-            this._targetProgress = Math.min(Math.max(progress, 0), 1);
+            this._targetProgress = target;
             this._active = active;
+            return;
+        }
+        // Grow the fill from zero when progress becomes visible again (for
+        // example when the island collapses back to the bar).
+        if (active && !this._active) {
+            this._activityColor = null;
+            this._progress = 0;
+            this._fromProgress = 0;
+            this._targetProgress = target;
+            this._elapsed = 0;
+            this._duration = 240;
+            this._active = true;
+            if (!this._tickId) {
+                this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16,
+                    () => this._tick());
+            }
+            return;
+        }
+        if (animate && active && Math.abs(target - this._progress) > 0.002) {
+            this._activityColor = null;
+            this._fromProgress = this._progress;
+            this._targetProgress = target;
+            this._elapsed = 0;
+            this._duration = 200;
+            this._active = active;
+            if (!this._tickId) {
+                this._tickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16,
+                    () => this._tick());
+            }
             return;
         }
         this._stopTick();
         this._activityColor = null;
-        this._progress = Math.min(Math.max(progress, 0), 1);
-        this._targetProgress = this._progress;
+        this._progress = target;
+        this._targetProgress = target;
         this._active = active;
         this.queue_repaint();
     }
@@ -207,11 +245,54 @@ class BarBackground extends St.DrawingArea {
         this.easeProgress(target, duration);
     }
 
-    setActivityPreview(progress) {
+    setActivityPreview(progress, {color = null, striped = false} = {}) {
         this._stopTick();
-        this._activityColor = [0.36, 0.68, 0.95, 1];
+        this._activityColor = color ?? [0.36, 0.68, 0.95, 1];
+        this._activityStriped = striped;
         this._progress = 0;
+        if (striped)
+            this._stripedTick();
         this.easeProgress(progress, 220);
+    }
+
+    /** Persistent preview while an activity dot is pinned (Shift+click). */
+    setPinnedActivityPreview(progress, {color = null, striped = true} = {}) {
+        this._stopTick();
+        this._activityColor = color ?? [0.36, 0.68, 0.95, 1];
+        this._activityStriped = striped;
+        this._progress = Math.min(Math.max(progress, 0), 1);
+        this._fromProgress = this._progress;
+        this._targetProgress = this._progress;
+        this._active = true;
+        this._stripedTick();
+        this.queue_repaint();
+    }
+
+    clearActivityPreview() {
+        this._activityStriped = false;
+        this._activityColor = null;
+        this._stopStripeTick();
+    }
+
+    _stripedTick() {
+        if (this._stripeTickId)
+            return;
+        this._stripeTickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+            if (!this._activityStriped || !this._active) {
+                this._stripeTickId = 0;
+                return GLib.SOURCE_REMOVE;
+            }
+            this._stripePhase = (this._stripePhase + 0.5) % 8;
+            this.queue_repaint();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    _stopStripeTick() {
+        if (this._stripeTickId) {
+            GLib.source_remove(this._stripeTickId);
+            this._stripeTickId = 0;
+        }
     }
 
     _stopTick() {
@@ -257,6 +338,25 @@ class BarBackground extends St.DrawingArea {
                     else
                         cr.setSourceRGBA(1, 1, 1, this._progressAlpha);
                     cr.fill();
+
+                    if (this._activityStriped) {
+                        // Darker diagonal stripes over the completed part,
+                        // scrolling slowly while the task runs.
+                        cr.save();
+                        makeRoundedRectPath(cr, progressWidth, height,
+                            Math.min(this._radius, progressWidth / 2));
+                        cr.clip();
+                        cr.setLineWidth(2);
+                        cr.setSourceRGBA(0, 0, 0, 0.28);
+                        const step = 8;
+                        for (let x = -height + this._stripePhase;
+                            x < progressWidth + height; x += step) {
+                            cr.moveTo(x, height);
+                            cr.lineTo(x + height, 0);
+                        }
+                        cr.stroke();
+                        cr.restore();
+                    }
                 }
             } else {
                 cr.setSourceRGBA(1, 1, 1, this._alpha);

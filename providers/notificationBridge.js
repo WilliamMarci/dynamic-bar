@@ -3,7 +3,8 @@ import GLib from 'gi://GLib';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {BarProvider} from '../provider.js';
+import {BarProvider, smallNotificationHeight, smallNotificationLabel}
+    from '../provider.js';
 
 export class NotificationBridgeProvider extends BarProvider {
     constructor(bar, settings) {
@@ -29,11 +30,11 @@ export class NotificationBridgeProvider extends BarProvider {
         if (this._settings.get_strv('notification-filter').includes(appId)) return;
         const title = notification.title ?? source.title ?? appId;
         if (!title) return;
+        const height = smallNotificationHeight(this._settings);
         const provider = {createIslandActor: () => {
             const viewport = new St.Widget({layout_manager: new Clutter.BinLayout(),
-                clip_to_allocation: true, width: 176, height: 10});
-            const label = new St.Label({text: title,
-                style_class: 'dynamic-bar-track-notification-label'});
+                clip_to_allocation: true, width: 176, height});
+            const label = smallNotificationLabel(title, this._settings);
             viewport.add_child(label);
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 if (!label.get_parent()) return GLib.SOURCE_REMOVE;
@@ -47,7 +48,7 @@ export class NotificationBridgeProvider extends BarProvider {
             return viewport;
         }, destroyIslandActor() {}};
         this.bar.notification(provider, {timeout: 1400, passive: true,
-            width: 192, height: 10, paddingX: 8, paddingY: 0});
+            width: 192, height, paddingX: 8, paddingY: 0});
     }
 
     destroy() {

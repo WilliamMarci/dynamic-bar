@@ -55,6 +55,20 @@
 
 # 各选项设计
 
+## 本轮实现记录
+
+已勾选的 A1–A6、B1–B3、B8 已落入代码：Activity v2 协议与持久化、回调动作、分组排序和四类进度位于 `providers/liveActivity.js`；CLI、日志和适配器位于 `tools/`；协议与 SDK 位于 `protocol/`、`sdk/`；Timer、CUPS、VolumeMonitor 和通知转接分别由对应 Provider 提供。
+
+本轮补做：island 展开改为上沿固定的高度生长动画、收起保持二段式；新增独立 Shortcuts 设置页与按键录入校验；`island run` 失败卡片提供由 wrapper 分离监听进程执行的 Retry；provider 自有 activity 使用 `heartbeat: false` 避免误判 orphaned；用户点选的卡片短时间内保持优先；CUPS 按 notifier 真实的 6/11 参数信号解析；Activity JSON Schema 补齐输入字段。
+
+第二轮 UI 修复：媒体展开态保留 bar 进度并在刷新时缓动；activity 进度条与媒体播放器复用 `progressBar.js` 同一绘制实现；activity 行改为单行“title | 进度条 | 百分比 | 控件”；不确定/无进度任务默认滚动高亮；暂停保留进度；activity 圆点改为外环并由 Fine Tune Activity 组配置尺寸、颜色、hover 放大与命中范围；完成后 notification 补上模块声明的左右留白；多页控制条展开键改为贴右对齐。
+
+第三轮：新增统一容器 `providers/cardDeck.js`（`IslandCardDeck`），媒体与 Live Activity 改为同级可切换卡片，Launcher 为底部附加页；展开键改为自绘粗圆头 V 形并调整控制条上下留白；`IslandControlContainer` 删除。测试清单见 `new.md`。
+
+第四轮：把 `IslandCardDeck` 提升到 `dynamicBar.js`（island 层），provider 只实现 `getCards()`/`getAttachedPage()`；Timer/Removable/Printing 有独立卡片页；U 盘改用一般 notification、圆点外环区分挂载状态并可配置、安全移除/拔出提示；notification 忽略列表改为可增删；activity 行与固定 bar 进度使用状态色+暗色动态斜纹；普通点击圆点切换并高亮对应行，Shift+点击固定 bar 进度并在圆点下显示小三角。测试清单见 `new.md`。
+
+仍需注销登录 Wayland GNOME 50 实机验证：展开/收起动画的每帧锚点、快捷键修改即时生效、Retry 完整链路、心跳与功耗、CUPS 与打印开关、真实 U 盘与通知转接。媒体卡片与 Live Activity 卡片目前仍是“媒体内容 + 底部附加页”结构，尚未改成同级可切换卡片。打印任务暂无法从 notifier 载荷区分提交用户，只能消费广播任务。
+
 ## A1 Activity 生命周期、恢复与清理
 
 ### 目的

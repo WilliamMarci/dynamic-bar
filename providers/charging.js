@@ -61,7 +61,8 @@ export class ChargingProvider extends BarProvider {
         if (!initial) {
             if (charging !== this._wasCharging) {
                 this._noticeLabel = charging ? 'Charging' : 'Discharging';
-                this.pushNotification({timeout: decay, passive: true});
+                this.pushNotification({timeout: decay, passive: true,
+                    paddingX: 16, paddingY: 10});
             } else if (!charging && percentage <= threshold &&
                 (this._lastPercentage === null || this._lastPercentage > threshold) &&
                 !this._lowNotified) {
@@ -71,6 +72,8 @@ export class ChargingProvider extends BarProvider {
                     timeout: decay,
                     passive: true,
                     pulse: true,
+                    paddingX: 16,
+                    paddingY: 10,
                 });
             }
         }
@@ -80,8 +83,7 @@ export class ChargingProvider extends BarProvider {
         this._wasCharging = charging;
         this._lastPercentage = percentage;
 
-        const presentation = this.bar.presentation;
-        if (presentation.expanded && presentation.provider === this)
+        if (this.bar.isShown(this))
             this.bar.refresh();
     }
 

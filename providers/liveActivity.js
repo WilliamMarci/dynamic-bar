@@ -1,8 +1,30 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
-import {BarProvider} from '../provider.js';
+import {BarProvider, smallNotificationHeight, smallNotificationLabel}
+    from '../provider.js';
+import {createIconButton} from '../controls.js';
+import {createProgressBar, ISLAND_PROGRESS_HEIGHT, ISLAND_PROGRESS_WIDTH}
+    from '../progressBar.js';
+
+function colorToRgb(value) {
+    const text = String(value || '').trim();
+    let match = text.match(/^#([0-9a-f]{6})$/i);
+    if (match) {
+        const hex = match[1];
+        return [
+            parseInt(hex.slice(0, 2), 16) / 255,
+            parseInt(hex.slice(2, 4), 16) / 255,
+            parseInt(hex.slice(4, 6), 16) / 255,
+        ];
+    }
+    match = text.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (match)
+        return [Number(match[1]) / 255, Number(match[2]) / 255, Number(match[3]) / 255];
+    return [1, 1, 1];
+}
 
 export const LIVE_BUS_NAME = 'org.gnome.Shell.Extensions.DynamicBar.LiveActivity';
 export const LIVE_OBJECT_PATH = '/org/gnome/Shell/Extensions/DynamicBar/LiveActivity';
@@ -50,6 +72,11 @@ export class LiveActivityProvider extends BarProvider {
         this._cacheDir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'dynamic-bar']);
         this._stateFile = Gio.File.new_for_path(GLib.build_filenamev([
             this._cacheDir, 'activities.json']));
+        this._selectedId = null;
+        this._selectedUntil = 0;
+        this._flashId = null;
+        this._flashTimerId = 0;
+        this._cardSignature = '';
         this._load();
         this._dbus = Gio.DBusExportedObject.wrapJSObject(XML, this);
         this._dbus.export(Gio.DBus.session, LIVE_OBJECT_PATH);
@@ -91,20 +118,30 @@ export class LiveActivityProvider extends BarProvider {
                 value: 1 - timer.remaining / seconds}, summary: `${Math.ceil(timer.remaining)}s remaining`});
             return GLib.SOURCE_CONTINUE;
         };
+        const startSource = () => {
+            if (!timer.sourceId)
+                timer.sourceId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, update);
+        };
         const pause = () => { if (!timer.paused) { update(); timer.paused = true;
+            if (timer.sourceId) GLib.source_remove(timer.sourceId);
+            timer.sourceId = 0;
             this.updateInternal(id, {status: 'paused'}); } };
         const resume = () => { if (timer.paused) { timer.paused = false;
             timer.deadline = GLib.get_monotonic_time() + timer.remaining * 1e6;
-            this.updateInternal(id, {status: 'running'}); } };
+            this.updateInternal(id, {status: 'running'}); startSource(); } };
         const end = () => { if (timer.sourceId) GLib.source_remove(timer.sourceId);
             timer.sourceId = 0; this._timers.delete(id);
             this.finishInternal(id, {status: 'cancelled', summary: 'Timer ended'}); };
         this.registerInternal({id, title: title || 'Timer', source: 'dynamic-bar', type: 'timer',
-            group: 'timer', progress: {kind: 'determinate', value: 0},
+            group: 'timer', heartbeat: false,
+            progress: {kind: 'determinate', value: 0},
             actions: [{id: 'pause', label: 'Pause'}, {id: 'resume', label: 'Resume'},
                 {id: 'skip', label: 'Skip'}, {id: 'end', label: 'End', dangerous: true}]},
-        {pause, resume, skip: () => { timer.remaining = 0; update(); }, end});
-        timer.sourceId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 1, update);
+        {pause, resume, skip: () => {
+            if (timer.sourceId) GLib.source_remove(timer.sourceId);
+            timer.sourceId = 0; timer.remaining = 0; update();
+        }, end});
+        startSource();
         this._timers.set(id, timer);
         update();
     }
@@ -126,9 +163,15 @@ export class LiveActivityProvider extends BarProvider {
             group: String(input.group || `${input.source || 'third-party'}:${input.type || 'task'}`),
             priority: Number(input.priority) || 0, status: input.status ?? 'running',
             progress: input.progress ?? {kind: 'indeterminate'}, actions: input.actions ?? [],
-            terminalPid: Number(input.terminalPid) || 0, summary: '', logPath: '', exitCode: null,
+            terminalPid: Number(input.terminalPid) || 0,
+            summary: String(input.summary || ''), logPath: String(input.logPath || ''), exitCode: null,
+            ring: typeof input.ring === 'string' ? input.ring : null,
             createdAt: timestamp, updatedAt: timestamp,
-            expiresAt: Number(input.expiresAt) || 0, heartbeatTimeout: Number(input.heartbeatTimeout) || 45000,
+            expiresAt: Number(input.expiresAt) || 0,
+            // Provider-owned tasks can opt out of heartbeat expiry; a client
+            // task that stops heartbeating is only marked orphaned, never failed.
+            heartbeatTimeout: input.heartbeat === false ? 0
+                : Number(input.heartbeatTimeout) || 45000,
         };
         this._tasks.set(task.id, task);
         this._sync(task);
@@ -154,6 +197,8 @@ export class LiveActivityProvider extends BarProvider {
         task.exitCode = result.exitCode ?? null;
         task.summary = String(result.summary ?? task.summary ?? '');
         task.logPath = String(result.logPath ?? task.logPath ?? '');
+        if (result.actions) task.actions = result.actions;
+        if (result.ring) task.ring = result.ring;
         if (result.progress) task.progress = result.progress;
         else if (task.status === 'success') task.progress = {kind: 'determinate', value: 1};
         task.updatedAt = now();
@@ -192,7 +237,8 @@ export class LiveActivityProvider extends BarProvider {
         for (const [group, task] of groups) {
             const progress = task.progress?.kind === 'determinate'
                 ? Number(task.progress.value) : NaN;
-            this.bar.activity(group, {status: task.status, progress});
+            this.bar.activity(group, {status: task.status, progress,
+                ring: task.ring, onClick: () => this._focusGroup(group)});
         }
         this._publishedGroups = new Set(groups.keys());
     }
@@ -201,8 +247,13 @@ export class LiveActivityProvider extends BarProvider {
         this._publishGroups();
         this._persist();
         for (const listener of this._listeners) listener();
-        const presentation = this.bar.presentation;
-        if (presentation.expanded && presentation.provider === this) this.bar.rebuild(this);
+        const signature = this.getCards().map(card => card.id).join('|');
+        if (signature !== this._cardSignature) {
+            this._cardSignature = signature;
+            this.bar.cardsChanged();
+        } else if (this.bar.isShown(this)) {
+            this.bar.cardsChanged();
+        }
     }
 
     _housekeeping() {
@@ -212,6 +263,7 @@ export class LiveActivityProvider extends BarProvider {
                 task.status = 'expired';
                 this.Dismiss(task.id);
             } else if (!TERMINAL_STATES.has(task.status) && task.status !== 'orphaned' &&
+                task.heartbeatTimeout > 0 &&
                 timestamp - task.updatedAt > task.heartbeatTimeout) {
                 task.status = 'orphaned';
                 this._sync(task);
@@ -244,9 +296,10 @@ export class LiveActivityProvider extends BarProvider {
     }
 
     _notifySmall(text) {
-        this.bar.notification({createIslandActor: () => new St.Label({text,
-            style_class: 'dynamic-bar-track-notification-label'}), destroyIslandActor() {}},
-        {timeout: 1200, passive: true, height: 10, paddingX: 8, paddingY: 0});
+        const height = smallNotificationHeight(this._settings);
+        this.bar.notification({createIslandActor: () =>
+            smallNotificationLabel(text, this._settings), destroyIslandActor() {}},
+        {timeout: 1200, passive: true, height, paddingX: 8, paddingY: 0});
     }
 
     _notifyComplete(task) {
@@ -257,7 +310,7 @@ export class LiveActivityProvider extends BarProvider {
             box.add_child(new St.Label({text: task.status === 'success'
                 ? `${task.title} completed` : `${task.title} ${task.status}`,
             style_class: 'dynamic-bar-notice-title'})); return box;}, destroyIslandActor() {}},
-        {timeout: 2800, passive: true});
+        {timeout: 2800, passive: true, paddingX: 16, paddingY: 10});
     }
 
     _requestAction(task, actionId) {
@@ -271,62 +324,331 @@ export class LiveActivityProvider extends BarProvider {
         this._dbus.emit_signal('ActionRequested', new GLib.Variant('(ss)', [task.id, actionId]));
     }
 
+    _hasTasks(predicate) {
+        for (const task of this._tasks.values()) {
+            if (predicate(task))
+                return true;
+        }
+        return false;
+    }
+
+    getCards() {
+        if (!this.hasActivities)
+            return [];
+        const cards = [{
+            id: 'live-activities',
+            createActor: () => this._createList(() => true),
+            onDestroy: () => {},
+        }];
+        if (this._hasTasks(task => task.group === 'timer')) {
+            cards.push({
+                id: 'timer',
+                createActor: () => this._createList(task => task.group === 'timer'),
+                onDestroy: () => {},
+            });
+        }
+        if (this._hasTasks(task => task.group === 'removable')) {
+            cards.push({
+                id: 'removable',
+                createActor: () => this._createList(task => task.group === 'removable'),
+                onDestroy: () => {},
+            });
+        }
+        if (this._hasTasks(task => task.type === 'print')) {
+            cards.push({
+                id: 'printing',
+                createActor: () => this._createList(task => task.type === 'print'),
+                onDestroy: () => {},
+            });
+        }
+        return cards;
+    }
+
     createIslandActor() {
+        return this._createList(() => true);
+    }
+
+    _createList(filter) {
         const list = new St.BoxLayout({vertical: true, style_class: 'dynamic-bar-live-list'});
-        const tasks = [...this._tasks.values()].sort((a, b) => {
-            const rank = status => ({error: 5, warning: 4, orphaned: 3, running: 2,
-                paused: 1, success: 0}[status] ?? 0);
-            return rank(b.status) - rank(a.status) || b.priority - a.priority || b.updatedAt - a.updatedAt;
-        });
-        for (const task of tasks) list.add_child(this._createRow(task));
+        const rank = status => ({error: 5, warning: 4, orphaned: 3, running: 2,
+            paused: 1, success: 0}[status] ?? 0);
+        const held = task => this._selectedId === task.id && now() < this._selectedUntil;
+        const groups = new Map();
+        for (const task of this._tasks.values()) {
+            if (!filter(task))
+                continue;
+            if (!groups.has(task.group)) groups.set(task.group, []);
+            groups.get(task.group).push(task);
+        }
+        const ordered = [...groups.entries()].sort(([, a], [, b]) =>
+            (Math.max(...b.map(task => rank(task.status))) +
+                (b.some(held) ? 100 : 0)) -
+            (Math.max(...a.map(task => rank(task.status))) +
+                (a.some(held) ? 100 : 0)) ||
+            Math.max(...b.map(task => task.priority)) - Math.max(...a.map(task => task.priority)));
+        for (const [group, tasks] of ordered) {
+            if (tasks.length > 1) list.add_child(new St.Label({
+                text: `${group} · ${tasks.length}`, style_class: 'dynamic-bar-live-group'}));
+            tasks.sort((a, b) => (rank(b.status) + (held(b) ? 100 : 0)) -
+                (rank(a.status) + (held(a) ? 100 : 0)) ||
+                b.priority - a.priority || b.updatedAt - a.updatedAt);
+            for (const task of tasks) list.add_child(this._createRow(task));
+        }
         return list;
     }
 
-    _createRow(task) {
-        const row = new St.BoxLayout({vertical: true, style_class: 'dynamic-bar-live-row'});
-        const main = new St.BoxLayout({style_class: 'dynamic-bar-live-row-content'});
-        main.add_child(new St.Label({text: task.title, style_class: 'dynamic-bar-live-title', x_expand: true}));
+    _activityStatusColor(status) {
+        const options = this.bar.presentation.options;
+        switch (status) {
+        case 'success': return options.activitySuccessColor;
+        case 'paused': return options.activityPausedColor;
+        case 'warning':
+        case 'orphaned': return options.activityWarningColor;
+        case 'error':
+        case 'cancelled': return options.activityErrorColor;
+        default: return options.activityRunningColor;
+        }
+    }
+
+    _progressModel(task) {
         const progress = task.progress ?? {kind: 'indeterminate'};
-        const track = new St.Widget({style_class: `dynamic-bar-live-progress ${progress.kind}`, width: 100, height: 5});
-        let percent = '…';
         if (progress.kind === 'determinate') {
             const value = Math.min(Math.max(Number(progress.value) || 0, 0), 1);
-            track.add_child(new St.Widget({style_class: `dynamic-bar-live-progress-fill ${task.status}`,
-                width: Math.round(100 * value), height: 5})); percent = `${Math.round(value * 100)}%`;
-        } else if (progress.kind === 'steps') {
-            percent = `${progress.current ?? 0}/${progress.total ?? '?'}`;
-        } else if (progress.kind === 'elapsed') {
-            percent = `${Math.floor((now() - task.createdAt) / 1000)}s`;
+            return {fraction: value, indeterminate: false,
+                label: `${Math.round(value * 100)}%`};
         }
-        main.add_child(track);
-        main.add_child(new St.Label({text: percent, style_class: 'dynamic-bar-live-percent'}));
-        row.add_child(main);
-        if (task.summary) row.add_child(new St.Label({text: task.summary, style_class: 'dynamic-bar-live-summary'}));
-        const actions = [...(task.actions ?? [])];
-        if (task.logPath) actions.unshift({id: 'open-log', label: 'Open Log', icon: 'text-x-generic-symbolic'});
-        if (task.status === 'orphaned' || TERMINAL_STATES.has(task.status))
-            actions.push({id: 'dismiss', label: 'Dismiss', icon: 'window-close-symbolic'});
-        if (actions.length) {
-            const buttons = new St.BoxLayout({style_class: 'dynamic-bar-live-actions'});
-            for (const action of actions.slice(0, 2)) {
-                const button = new St.Button({label: action.label ?? action.id,
-                    style_class: action.dangerous ? 'dynamic-bar-live-action destructive' : 'dynamic-bar-live-action'});
-                let armed = false;
-                button.connect('clicked', () => {
-                    if (action.dangerous && !armed) { armed = true; button.label = 'Confirm'; return; }
-                    this._requestAction(task, action.id);
-                });
-                buttons.add_child(button);
+        if (progress.kind === 'steps') {
+            const current = Number(progress.current) || 0;
+            if (Number(progress.total) > 0) {
+                return {fraction: Math.min(current / progress.total, 1),
+                    indeterminate: false, label: `${current}/${progress.total}`};
             }
-            row.add_child(buttons);
+            return {fraction: 0, indeterminate: true, label: `${current}/?`};
         }
-        row.connect('button-press-event', () => { this._activateTerminal(task.terminalPid); return 0; });
+        if (progress.kind === 'elapsed') {
+            return {fraction: 0, indeterminate: true,
+                label: `${Math.floor((now() - task.createdAt) / 1000)}s`};
+        }
+        return {fraction: 0, indeterminate: true, label: '…'};
+    }
+
+    _createProgress(task) {
+        const options = this.bar.presentation.options;
+        const model = this._progressModel(task);
+        const actor = createProgressBar({
+            width: ISLAND_PROGRESS_WIDTH,
+            height: ISLAND_PROGRESS_HEIGHT,
+            style_class: 'dynamic-bar-progress',
+            trackAlpha: options.trackAlpha,
+            progressAlpha: options.progressAlpha,
+            fillColor: colorToRgb(this._activityStatusColor(task.status)),
+            indeterminate: model.indeterminate,
+            striped: task.status === 'running' || task.status === 'warning',
+        });
+        if (!model.indeterminate)
+            actor.setProgress(model.fraction, {animate: false});
+        return {actor, label: model.label};
+    }
+
+    _actionButton(task, action) {
+        const label = () => action.label ?? action.id;
+        const icons = {
+            pause: 'media-playback-pause-symbolic',
+            resume: 'media-playback-start-symbolic',
+            skip: 'media-skip-forward-symbolic',
+            end: 'process-stop-symbolic',
+            cancel: 'process-stop-symbolic',
+            eject: 'media-eject-symbolic',
+            unmount: 'media-eject-symbolic',
+            open: 'folder-open-symbolic',
+            retry: 'view-refresh-symbolic',
+        };
+        const button = createIconButton({
+            iconName: action.icon || icons[action.id] || 'emblem-system-symbolic',
+            tooltip: label(),
+            destructive: action.dangerous,
+            iconSize: 15,
+        });
+        let armed = false;
+        let resetId = 0;
+        button.connect('clicked', () => {
+            if (action.dangerous && !armed) {
+                armed = true;
+                button.setActionIcon('dialog-warning-symbolic');
+                resetId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2500, () => {
+                    resetId = 0;
+                    armed = false;
+                    button.setActionIcon(action.icon || icons[action.id] ||
+                        'emblem-system-symbolic');
+                    return GLib.SOURCE_REMOVE;
+                });
+                return;
+            }
+            if (resetId) {
+                GLib.source_remove(resetId);
+                resetId = 0;
+            }
+            this._requestAction(task, action.id);
+        });
+        return button;
+    }
+
+    _visibleActions(task) {
+        return (task.actions ?? []).filter(action => {
+            if (action.id === 'pause') return task.status === 'running';
+            if (action.id === 'resume') return task.status === 'paused';
+            return !TERMINAL_STATES.has(task.status);
+        });
+    }
+
+    _cardIdForGroup(group) {
+        if (group === 'timer')
+            return 'timer';
+        if (group === 'removable')
+            return 'removable';
+        if (String(group).startsWith('print'))
+            return 'printing';
+        return 'live-activities';
+    }
+
+    _focusGroup(group) {
+        const rank = status => ({error: 5, warning: 4, orphaned: 3, running: 2,
+            paused: 1, success: 0}[status] ?? 0);
+        const task = [...this._tasks.values()]
+            .filter(item => item.group === group)
+            .sort((a, b) => rank(b.status) - rank(a.status) ||
+                b.updatedAt - a.updatedAt)[0];
+        if (task) {
+            this._selectedId = task.id;
+            this._selectedUntil = now() + 5000;
+            this._flashId = task.id;
+            if (this._flashTimerId)
+                GLib.source_remove(this._flashTimerId);
+            this._flashTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1400,
+                () => {
+                    this._flashTimerId = 0;
+                    this._flashId = null;
+                    if (this.bar.isShown(this))
+                        this.bar.cardsChanged();
+                    return GLib.SOURCE_REMOVE;
+                });
+        }
+        this.bar.focusCard(this._cardIdForGroup(group));
+    }
+
+    _createRow(task) {
+        // Shared card rhythm: metadata/actions first, full-width progress below.
+        const classes = ['dynamic-bar-live-row'];
+        if (task.id === this._flashId)
+            classes.push('flash');
+        if (this._selectedId === task.id && now() < this._selectedUntil)
+            classes.push('selected');
+        const row = new St.BoxLayout({
+            style_class: classes.join(' '),
+            reactive: true,
+            track_hover: true,
+            vertical: true,
+            width: ISLAND_PROGRESS_WIDTH + 14,
+        });
+
+        const header = new St.BoxLayout({
+            style_class: 'dynamic-bar-live-row-content',
+            x_expand: true,
+        });
+
+        const title = new St.Label({
+            text: task.title,
+            style_class: 'dynamic-bar-live-title',
+            x_expand: true,
+            x_align: Clutter.ActorAlign.START,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        if (task.summary)
+            title.accessible_name = task.summary;
+        header.add_child(title);
+
+        const {actor: progress, label} = this._createProgress(task);
+        header.add_child(new St.Label({
+            text: label,
+            style_class: 'dynamic-bar-live-percent',
+            x_align: Clutter.ActorAlign.END,
+            y_align: Clutter.ActorAlign.CENTER,
+        }));
+
+        const controls = new St.BoxLayout({
+            style_class: 'dynamic-bar-live-actions',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        for (const action of this._visibleActions(task))
+            controls.add_child(this._actionButton(task, action));
+        if (task.logPath) {
+            const openLog = createIconButton({
+                iconName: 'text-x-generic-symbolic', tooltip: 'Open Log',
+                onClicked: () => this._requestAction(task, 'open-log'),
+            });
+            controls.add_child(openLog);
+        }
+        const untrack = createIconButton({
+            iconName: 'window-close-symbolic', tooltip: 'Stop tracking',
+            onClicked: () => this.Dismiss(task.id),
+        });
+        controls.add_child(untrack);
+        header.add_child(controls);
+        row.add_child(header);
+        progress.x_align = Clutter.ActorAlign.CENTER;
+        row.add_child(progress);
+
+        row.connect('button-press-event', () => {
+            // Keep the user's card near the top for a short while so a
+            // low-priority update cannot reorder it away immediately.
+            this._selectedId = task.id;
+            this._selectedUntil = now() + 5000;
+            this._activateTerminal(task.terminalPid);
+            return Clutter.EVENT_STOP;
+        });
         return row;
     }
 
+    _processAncestors(pid) {
+        const ancestors = new Set();
+        let current = Number(pid) || 0;
+        for (let depth = 0; depth < 12 && current > 1; depth++) {
+            ancestors.add(current);
+            try {
+                const [ok, bytes] = GLib.file_get_contents(`/proc/${current}/stat`);
+                if (!ok)
+                    break;
+                const text = new TextDecoder().decode(bytes);
+                const end = text.lastIndexOf(')');
+                if (end < 0)
+                    break;
+                const fields = text.slice(end + 2).split(' ');
+                current = Number(fields[1]) || 0;
+            } catch {
+                break;
+            }
+        }
+        return ancestors;
+    }
+
     _activateTerminal(pid) {
-        const actor = global.get_window_actors().find(item => item.meta_window.get_pid() === pid);
-        actor?.meta_window.activate(global.get_current_time());
+        if (!pid)
+            return false;
+        // The wrapper reports its parent PID. The terminal window usually
+        // belongs to an ancestor process (terminal server, not the shell), so
+        // match the window PID against the process ancestry.
+        const ancestors = this._processAncestors(pid);
+        const actors = global.get_window_actors();
+        const target = actors.find(item =>
+            ancestors.has(item.meta_window?.get_pid?.()));
+        if (!target)
+            return false;
+        try {
+            target.meta_window.activate(global.get_current_time());
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     destroy() {

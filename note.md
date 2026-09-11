@@ -18,6 +18,10 @@
 
 在设置页单独一页展示fine tune， 用于微调所有参数调整效果
 
+## 设置页
+
+Fine tune 之外的设置分为独立页面：Content 只保留功能开关、通知过滤与 Launcher 配置；快捷键位于独立的 Shortcuts 页，不与功能开关混排。每条快捷键显示人类可读的组合键标签，支持按键录入新增或修改、单独清空以及恢复默认。录入时拒绝无效组合与危险的单键绑定，只接受带 Ctrl/Alt/Super 修饰键的合法 accelerator；修改后无需注销即可生效。
+
 弹出/收起动画有统一总开关。关闭时状态和最终几何必须与开启动画一致，只跳过过渡过程。
 
 ## 事件模型
@@ -36,9 +40,11 @@ Provider 只通过 `DynamicBarApi` 发布上述事件；API 是动画、状态�
 
 ## 通用窄控制容器
 
-Island 底部的小型开关、分页和常驻控件统一使用 `IslandControlContainer`，不得在各功能中重复实现导航和测量逻辑。容器负责自然尺寸变化、点击、滚轮、hover/focus 状态以及向统一 API 请求重新布局。其高度统一读取 Fine Tune 的 `compact-control-height`。
+Island 内容统一由 `dynamicBar.js` 持有的 `IslandCardDeck` 承载：Provider 只通过 `getCards()` 注册同级可切换卡片（媒体、Live Activity、Timer、Removable、Printing 等），通过 `getAttachedPage()` 注册底部展开页（默认 Launcher）；导航、圆点分页、展开/收回、命中与重新测量都由 deck 在 island 层实现，任何功能不得再自建 tab/分页逻辑，也不得自行组装 deck。切换到某张卡片或附加页时由 `DynamicBarApi.isShown()` 判定可见性；卡片集合变化用 `cardsChanged()` 通知 island 重建并保留当前选中的卡片。
 
-单个附加页面时只显示居中的粗圆 V 图标，常态无按钮底色且与上下内容间距为 0；hover/focus 可显示轻微背景反馈。多个附加页面时，中间使用类似 Ubuntu Multi Workspace 的圆点分页器，当前页高亮，支持点击圆点以及在整个窄区域使用普通滚轮或触控板平滑滚动切换。展开/收回按钮让出中央导航位置并右对齐。
+Island 底部的小型开关、分页和常驻控件统一使用 `IslandCardDeck`，不得在各功能中重复实现导航和测量逻辑。容器负责自然尺寸变化、点击、滚轮、hover/focus 状态以及向统一 API 请求重新布局。其高度统一读取 Fine Tune 的 `compact-control-height`。
+
+单个附加页面时只显示居中的粗圆 V 图标，常态无按钮底色且与上下内容间距为 0；hover/focus 可显示轻微背景反馈。多个附加页面时，中间使用类似 Ubuntu Multi Workspace 的圆点分页器，当前页高亮，支持点击圆点以及在整个窄区域使用普通滚轮或触控板平滑滚动切换。展开/收回按钮让出中央导航位置并右对齐；展开键为自绘的粗圆头 V 形，控制条整体上方留出间距、下方留白更小。附加页在展开键下方展开。
 
 notification 可以独立声明：
 
@@ -53,6 +59,8 @@ notification 可以独立声明：
 dynamic bar 始终以屏幕/Panel 中心为中心改变宽度。左右图标区锚定到 bar 的两端，必须在 bar 动画的每一帧跟随移动；图标区宽度按内容自然尺寸计算，不能用固定窄框裁成 `...`。
 
 收起使用二段式动画：第一段只把 Dynamic island 收回，bar 保持收回开始时已经显示的水平位置和实际长度，不能强制切换到预设长宽。第一段结束后清空 island 内容并重新测量 root，同时把 bar 的屏幕坐标换算回新 root 的局部坐标，避免 root 尺寸变化造成跳动。第二段再根据当前 hover/折叠状态判断是否需要改变长度并从中心动画到目标。第二段结束时必须按 primary monitor 中心重新写入精确的 x/width/y。
+
+展开使用单段生长动画：island 上沿固定在与 Panel 底边相接的位置，只向下改变高度；内容 holder 与 island 同步裁剪，bar 和左右状态区跟随 island 底沿移动。禁止再用整体 `translation_y` 滑入，否则 island 基部会上下移动。关闭弹出动画总开关时只跳过过渡过程，最终状态与几何必须与开启动画完全一致。
 
 左右状态 actor 在各自区域内朝 bar 一侧对齐。图标与 bar 的视觉距离不得受对称占位区影响；SVG 自身留白与 actor 分配留白需要分别排查。
 
@@ -76,7 +84,7 @@ dynamic bar 始终以屏幕/Panel 中心为中心改变宽度。左右图标区�
 
 ### 展开态
 
-灵动条恢复默认的长条状态
+灵动条仍是长条状态，并继续显示当前播放的轨道与进度；暂停时保留最后一帧进度而不回落。进度刷新用快速缓动衔接，不能每次刷新都瞬跳。
 
 显示：
 
@@ -110,9 +118,11 @@ Launcher 使用结构化项目配置。设置页可逐项增加、删除，并�
 
 命令输出进度解析属于独立兼容层 `tools/progressAdapters.hpp`。适配器通过稳定的具名注册 API 提供 id、匹配命令、说明与解析规则，`island list` 直接读取同一注册表。首版提供 CMake/Make/Ninja、APT/DPKG 和通用百分比适配；未来 SCP 等兼容只注册新 Adapter，不修改命令执行、输出转发、D-Bus 或 UI 层。无法识别时显示不确定进度，不能因此阻止 activity、完成状态或原命令执行。
 
-开始时发送 small notification 并在左图标区创建 activity 圆点。运行中圆点为橙色；完成为绿色并带白色边框，同时发送带勾的 completed notification，失败则显示错误和退出码。点击圆点会约 1.8 秒临时把 bar 切换到该任务进度，颜色使用 GNOME 风格的主题强调色，随后恢复原 progress。
+开始时发送 small notification 并在左图标区创建 activity 圆点。圆点直径默认等于 bar 高度，完成态的白色环绘制在圆点外围而不是内侧；可挂载/已移除等状态用可配置的外环颜色区分（Fine Tune 的 Removable 色项）。圆点周围保留更大的命中区域，指针靠近并停留一小段后圆点带缓动放大，hover 时显示外圈反馈，方便点击。运行中为橙色；完成为绿色并带白色外环，同时发送带勾的 completed notification，失败则显示错误和退出码。普通点击圆点会切换到对应卡片并高亮闪烁该行；Shift+点击圆点把 bar 固定在该任务的进度上，并在圆点下方显示向上指的小三角，再次 Shift+点击取消。临时预览约 1.8 秒，颜色使用主题/状态强调色，随后恢复原 progress。
 
-展开列表每行按“左侧 title、右侧进度条、百分比”排列。常态无背景，hover 才显示背景。点击行尝试按启动终端 PID 激活对应窗口；无法关联终端时静默退化，不影响任务。媒体和 Live Activity 同时存在时注册为可通过底部圆点切换的常驻卡片；附加 Launcher 仍复用通用容器。
+展开列表每行固定为单行水平布局：左侧 title，接着进度条，再是百分比，最后是常驻控件区。进度条必须与媒体播放器复用同一个圆角绘制实现（轨道/填充均为圆角，填充末端也是圆的），不得另写一套；暂停时保留当前进度不回落，进度变化用快速缓动过渡而不是突变；运行中的任务使用状态/主题色加暗色动态斜纹，能读取到百分比才画 determinate，否则显示持续滚动的不确定高亮条，steps 无总数时显示 `N/?`。控件区包含任务自身动作和“停止追踪”按钮：停止追踪只把任务移出追踪列表，不结束对应进程；点击行的 hover 区域尝试把对应终端窗口提到最前，无法可靠关联时静默退化。常态无背景，hover 才显示背景。Timer、Removable、Printing 各有独立的卡片页。
+
+notification 与 Island 内容必须由模块声明 `paddingX`/`paddingY`；completed 等 notification 不得省略左右留白。底部圆点分页器居中时，展开/收回按钮必须让出中央并贴右对齐，单页时保持居中。媒体和 Live Activity 同时存在时注册为可通过底部圆点切换的常驻卡片；附加 Launcher 仍复用通用容器。
 
 ## 2. 充电提示
 
@@ -141,3 +151,17 @@ Primary monitor 上存在最大化窗口，或窗口横向铺满并贴住顶端�
 最大化背景分别提供深色与浅色两个可配置颜色，按 `org.gnome.desktop.interface color-scheme` 选择；颜色无效时才回退到当前 Panel 合成色并强制不透明。
 
 Fine Tune 中的颜色项必须使用 GNOME/GTK 原生颜色选择面板，不能要求用户手写颜色字符串。
+
+## Activity v2 与系统事件标准
+
+Activity 使用版本化 session D-Bus 协议，状态统一为 running、paused、success、warning、error、cancelled、orphaned、expired。运行方以低频 heartbeat 续期；Shell 重启后仅恢复非敏感元数据，并把未结束项标为 orphaned。折叠态按 group 合并为一个状态圆点，展开态先按错误/交互需要，再按 priority 和更新时间排序。
+
+Activity action 必须是 `activityId + actionId` 回调，Shell 不执行第三方传入的命令字符串。主动作最多两个，其余进入 More 区；危险动作二次确认。进度明确时才使用 determinate，否则使用流动的 indeterminate、`N/M` steps 或 elapsed。Provider 自有 activity（timer、打印、挂载）声明 `heartbeat: false`，不因缺少心跳被误判 orphaned；用户手动点选的卡片在短时间内保持优先，不被低优先级更新挤走。
+
+`island run` 直接 exec 参数、透传输出和退出码，在插件不可用时照常执行原命令。失败卡片提供 Retry：由 wrapper 的分离监听进程收到 `ActionRequested(id, "retry")` 后自行重启原始参数，Shell 不生成本命令字符串。日志去除 ANSI 后写入用户 cache，单文件上限 1 MiB 并保留一份轮转；D-Bus 只保存摘要与路径。协议、JSON Schema、Bash/C++ 示例及 inspect/demo 调试命令必须同步维护。
+
+Timer 使用 monotonic time；暂停时停止刷新，恢复后按剩余时间重建 deadline，没有计时器时不得保留一秒刷新源。打印只消费 CUPS notifier 明确广播的可见任务，不扫描队列；按 notifier 的 11 参数 Job 信号与 6 参数 Printer 信号解析，job-state 用 IPP 枚举（processing/held/stopped/canceled/aborted/completed）；页数未知显示 `N/?`，不得伪造百分比。U 盘只由 `Gio.VolumeMonitor` 事件驱动，并区分 unmount/eject 与物理断电。GNOME 通知转接默认关闭，使用独立开关与 application ID 过滤表，且只生成 small notification，不实现第二个通知中心。
+
+Media、Timer、Live Activity、Removable 和 Printing 卡片不得各自实现视觉相近但尺寸不同的控件。Island 内标准进度条统一由 `progressBar.js` 创建，默认宽度 270px、高度 6px，统一使用圆角轨道、颜色、indeterminate 和进度缓动；Media 只在其上增加 seek 交互。标准动作统一使用 `controls.js` 的圆形图标按钮，常态不显示文字背景，hover/focus 才显示圆形反馈和动作提示。动作集合必须随状态裁剪，例如 Timer running 只显示 Pause，paused 只显示 Resume，结束后不再显示运行控制。
+
+Activity dot 的 hover 与点击属于统一的进度预览入口：hover 延迟触发后，底部 dynamic bar 从 0 生长到该 Activity 当前进度，并在指针仍停留于圆点区时保持；不确定进度使用统一的活动预览占位和动态斜纹。Shift+点击仍用于持久固定，普通点击用于打开并聚焦对应卡片。
