@@ -178,4 +178,6 @@ Activity 完成后的生命周期由 `Automatically remove completed activities`
 
 Activity dot 列表以 dynamic bar 左侧图标区的右边缘为锚点，最新增加的 dot 从最右槽弹入，已有 dots 向左让位。删除中间 dot 时，只让空位左侧的 dots 平滑向右补位，右侧项目保持原位；进度或颜色更新不得触发布局位移动画。新增使用缩放与透明度回弹，补位使用连续位移，并统一服从 animations 开关。
 
+Activity dot 列表的最终锚点必须来自当前帧 dynamic bar progress track 的实际左端，而不是目标 bar 宽度、左右区最大自然宽度或动画结束后的预测位置。dot box 在 left zone 内右对齐，最右 dot 与当前 progress 左端之间始终保留 `ZONE_GAP`；bar 的 x/width 动画每帧变化时左右图标区同步跟随。
+
 Stop tracking 必须能删除最后一项；最后一项消失后对应 page 立即从 deck 移除，若没有其他卡片则回退到 Launcher。Island 自动收回必须同时检查背景、内容 holder 和 bar 的 hover，鼠标位于任何 island 内容上时不得收回。可恢复错误统一用 `[Dynamic Bar][模块]` 结构写入 GNOME Shell journal，并携带对象 ID 或配置项上下文，禁止吞掉解析、图标、卡片创建和设备操作异常。

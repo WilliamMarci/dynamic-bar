@@ -154,7 +154,11 @@ export const DynamicBar = GObject.registerClass({
         });
         this._actor.add_child(this._leftZone);
         this._actor.add_child(this._rightZone);
-        this._activityBox = new St.BoxLayout({style_class: 'dynamic-bar-activities'});
+        this._activityBox = new St.BoxLayout({
+            style_class: 'dynamic-bar-activities',
+            x_align: Clutter.ActorAlign.END,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
         this._leftZone.add_child(this._activityBox);
 
         this._island.connectObject(
@@ -1545,10 +1549,26 @@ export const DynamicBar = GObject.registerClass({
         const rightY = Math.max(0, Math.min(centerFor(rightSize),
             this._rootHeight - rightSize));
 
+        // Anchor indicators to the currently rendered progress track, not to
+        // a target width calculated elsewhere.  Transformed coordinates also
+        // follow Clutter's in-flight x animation frame by frame.
+        let progressLeft = barX;
+        let progressRight = barX + barWidth;
+        try {
+            const [barStageX] = this._bar.get_transformed_position();
+            const [rootStageX] = this._actor.get_transformed_position();
+            if (Number.isFinite(barStageX) && Number.isFinite(rootStageX)) {
+                progressLeft = barStageX - rootStageX;
+                progressRight = progressLeft + barWidth;
+            }
+        } catch {
+            // Before the actor reaches the stage, allocation coordinates are
+            // already the correct fallback in the shared root.
+        }
         this._leftZone.set_position(
-            Math.round(barX - ZONE_GAP - sideWidth), leftY);
+            Math.round(progressLeft - ZONE_GAP - sideWidth), leftY);
         this._leftZone.set_size(sideWidth, leftSize);
-        this._rightZone.set_position(Math.round(barX + barWidth + ZONE_GAP), rightY);
+        this._rightZone.set_position(Math.round(progressRight + ZONE_GAP), rightY);
         this._rightZone.set_size(sideWidth, rightSize);
     }
 

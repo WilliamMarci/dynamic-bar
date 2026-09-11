@@ -174,3 +174,4 @@
 - [ ] 新 Activity 在开始后的前几秒让 dynamic bar 显示缩小版主题色/斜纹进度；Shift 固定 dot 后持续显示，连续更新不回零、不跳帧，暂停时仅冻结斜纹。
 - [ ] Timer started 显示普通两行 notification；列表 progress 厚度可在 Fine Tune 调整；Media/Activity/Timer/Device 的 dynamic bar 颜色和斜纹可分别设置。
 - [ ] Activity dots 右侧锚定：新增项在最右槽弹入并推动旧项向左；删除中间项时仅左侧 dots 向右滑动补位；普通进度更新不产生位置动画。
+- [ ] Activity dots 最右端按当前帧 dynamic bar progress 的实际左端定位，展开、收缩和宽度动画中始终保持间距且不覆盖 track。
