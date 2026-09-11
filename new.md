@@ -175,3 +175,4 @@
 - [ ] Timer started 显示普通两行 notification；列表 progress 厚度可在 Fine Tune 调整；Media/Activity/Timer/Device 的 dynamic bar 颜色和斜纹可分别设置。
 - [ ] Activity dots 右侧锚定：新增项在最右槽弹入并推动旧项向左；删除中间项时仅左侧 dots 向右滑动补位；普通进度更新不产生位置动画。
 - [ ] Activity dots 最右端按当前帧 dynamic bar progress 的实际左端定位，展开、收缩和宽度动画中始终保持间距且不覆盖 track。
+- [ ] 鼠标位于 island 任意 page 区域时可滚轮切页，单次滚动只切一次；列表 progress 垂直居中，实际 surface 高度与 Fine Tune 设置一致，不被整行拉伸。

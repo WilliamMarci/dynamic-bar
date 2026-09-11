@@ -70,6 +70,7 @@ export class IslandCardDeck {
         this._navigation = null;
         this._toggle = null;
         this._toggleIcon = null;
+        this._lastScrollAt = 0;
     }
 
     addCard({id, createActor, onDestroy = null, layout = null}) {
@@ -134,7 +135,11 @@ export class IslandCardDeck {
             vertical: true,
             style_class: 'dynamic-bar-deck',
             x_expand: true,
+            reactive: true,
+            track_hover: true,
         });
+        this._root.connect('scroll-event', (_actor, event) =>
+            this._onScroll(event));
         this._cardHolder = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
@@ -150,8 +155,6 @@ export class IslandCardDeck {
             x_expand: true,
             height: this._controlHeight(),
         });
-        this._strip.connect('scroll-event', (_actor, event) =>
-            this._onScroll(event));
         this._root.add_child(this._strip);
 
         // The attached page expands below the control strip, i.e. under the
@@ -406,6 +409,10 @@ export class IslandCardDeck {
         }
         if (!step)
             return Clutter.EVENT_PROPAGATE;
+        const timestamp = GLib.get_monotonic_time() / 1000;
+        if (timestamp - this._lastScrollAt < 180)
+            return Clutter.EVENT_STOP;
+        this._lastScrollAt = timestamp;
         this._onInteraction?.();
         this.selectCard((this._activeIndex + step + this._cards.length) %
             this._cards.length);

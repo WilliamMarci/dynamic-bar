@@ -1,4 +1,5 @@
 import GLib from 'gi://GLib';
+import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 export const ISLAND_PROGRESS_WIDTH = 270;
@@ -44,6 +45,7 @@ export function createProgressBar(params = {}) {
         style_class: params.styleClass ?? 'dynamic-bar-progress',
         reactive: params.reactive ?? false,
         track_hover: params.reactive ?? false,
+        y_align: Clutter.ActorAlign.CENTER,
     });
     area.set_size(params.width ?? ISLAND_PROGRESS_WIDTH,
         params.height ?? ISLAND_PROGRESS_HEIGHT);

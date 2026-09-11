@@ -176,6 +176,8 @@ Activity 完成后的生命周期由 `Automatically remove completed activities`
 
 卡片左右边距必须由真实几何 frame 保证，不能依赖 `Clutter.BinLayout` 子项的 CSS margin。`card-page-width` 表示包含左右边距的总宽度。紧凑列表先计算最右侧实际按钮数量与宽度，再从剩余宽度按设计比例分配标题、progress 和 value；按钮始终右对齐，标题左对齐并只在空间确实不足时省略。列表 progress 厚度是 Fine Tune 的独立设置。Timer started 使用普通两行 notification，不使用 small notification。Dynamic bar 的 Media、Activity、Timer、Device 分别具有可配置颜色和斜纹开关，固定与临时预览都必须遵守当前类型的绘制设置。
 
+Island Card Deck 的整个可见区域都接收滚轮事件：上/左切到前一 page，下/右切到后一 page，平滑滚动按主轴方向判定；事件只由根容器处理一次。统一 progress DrawingArea 必须显式垂直居中，否则横向 `St.BoxLayout` 会把 surface 拉伸到整行高度，使 Fine Tune 的厚度设置看似失效。
+
 Activity dot 列表以 dynamic bar 左侧图标区的右边缘为锚点，最新增加的 dot 从最右槽弹入，已有 dots 向左让位。删除中间 dot 时，只让空位左侧的 dots 平滑向右补位，右侧项目保持原位；进度或颜色更新不得触发布局位移动画。新增使用缩放与透明度回弹，补位使用连续位移，并统一服从 animations 开关。
 
 Activity dot 列表的最终锚点必须来自当前帧 dynamic bar progress track 的实际左端，而不是目标 bar 宽度、左右区最大自然宽度或动画结束后的预测位置。dot box 在 left zone 内右对齐，最右 dot 与当前 progress 左端之间始终保留 `ZONE_GAP`；bar 的 x/width 动画每帧变化时左右图标区同步跟随。
