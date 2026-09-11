@@ -221,7 +221,13 @@ export class IslandCardDeck {
     }
 
     _pageWidth() {
-        return Math.max(420, this._settings.get_int('card-page-width'));
+        try {
+            if (this._settings.settings_schema.has_key('card-page-width'))
+                return Math.max(420, this._settings.get_int('card-page-width'));
+        } catch (error) {
+            logError('CardDeck', error, 'read card-page-width');
+        }
+        return 520;
     }
 
     destroy() {
