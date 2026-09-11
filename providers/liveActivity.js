@@ -443,7 +443,9 @@ export class LiveActivityProvider extends BarProvider {
             progressAlpha: options.progressAlpha,
             fillColor: colorToRgb(this._activityStatusColor(task.status)),
             indeterminate: model.indeterminate,
-            striped: task.status === 'running' || task.status === 'warning',
+            striped: task.status === 'running' || task.status === 'warning' ||
+                task.status === 'paused',
+            stripeAnimated: task.status !== 'paused',
         });
         if (!model.indeterminate)
             actor.setProgress(model.fraction, {animate: false});

@@ -4,6 +4,8 @@ import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 
+import {drawRoundedRect} from './progressBar.js';
+
 const TAU = Math.PI * 2;
 
 function lerp(a, b, t) {
@@ -30,17 +32,6 @@ function makeFusedPath(cr, width, height, topRadius, bottomRadius) {
         0.25 * TAU, 0);
     cr.lineTo(width - fillet, fillet);
     cr.arc(width, fillet, fillet, 0.5 * TAU, 0.75 * TAU);
-    cr.closePath();
-}
-
-function makeRoundedRectPath(cr, width, height, radius) {
-    const r = Math.min(radius, width * 0.5, height * 0.5);
-
-    cr.newSubPath();
-    cr.arc(width - r, r, r, -0.5 * Math.PI, 0);
-    cr.arc(width - r, height - r, r, 0, 0.5 * Math.PI);
-    cr.arc(r, height - r, r, 0.5 * Math.PI, Math.PI);
-    cr.arc(r, r, r, Math.PI, 1.5 * Math.PI);
     cr.closePath();
 }
 
@@ -145,6 +136,7 @@ class BarBackground extends St.DrawingArea {
         this._duration = 0;
         this._tickId = 0;
         this._activityStriped = false;
+        this._activityStripeAnimated = false;
         this._stripePhase = 0;
         this._stripeTickId = 0;
 
@@ -245,31 +237,37 @@ class BarBackground extends St.DrawingArea {
         this.easeProgress(target, duration);
     }
 
-    setActivityPreview(progress, {color = null, striped = false} = {}) {
+    setActivityPreview(progress, {color = null, striped = false,
+        animateStripes = striped} = {}) {
         this._stopTick();
         this._activityColor = color ?? [0.36, 0.68, 0.95, 1];
         this._activityStriped = striped;
+        this._activityStripeAnimated = animateStripes;
         this._progress = 0;
-        if (striped)
+        if (striped && animateStripes)
             this._stripedTick();
         this.easeProgress(progress, 220);
     }
 
     /** Persistent preview while an activity dot is pinned (Shift+click). */
-    setPinnedActivityPreview(progress, {color = null, striped = true} = {}) {
+    setPinnedActivityPreview(progress, {color = null, striped = true,
+        animateStripes = striped} = {}) {
         this._stopTick();
         this._activityColor = color ?? [0.36, 0.68, 0.95, 1];
         this._activityStriped = striped;
+        this._activityStripeAnimated = animateStripes;
         this._progress = Math.min(Math.max(progress, 0), 1);
         this._fromProgress = this._progress;
         this._targetProgress = this._progress;
         this._active = true;
-        this._stripedTick();
+        if (striped && animateStripes)
+            this._stripedTick();
         this.queue_repaint();
     }
 
     clearActivityPreview() {
         this._activityStriped = false;
+        this._activityStripeAnimated = false;
         this._activityColor = null;
         this._stopStripeTick();
     }
@@ -278,7 +276,8 @@ class BarBackground extends St.DrawingArea {
         if (this._stripeTickId)
             return;
         this._stripeTickId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
-            if (!this._activityStriped || !this._active) {
+            if (!this._activityStriped || !this._activityStripeAnimated ||
+                !this._active) {
                 this._stripeTickId = 0;
                 return GLib.SOURCE_REMOVE;
             }
@@ -324,14 +323,14 @@ class BarBackground extends St.DrawingArea {
         const [width, height] = this.get_surface_size();
 
         if (width > 0 && height > 0) {
-            makeRoundedRectPath(cr, width, height, this._radius);
+            drawRoundedRect(cr, 0, 0, width, height, this._radius);
 
             if (this._active) {
                 cr.setSourceRGBA(1, 1, 1, this._trackAlpha);
                 cr.fill();
                 const progressWidth = width * this._progress;
                 if (progressWidth > 0) {
-                    makeRoundedRectPath(cr, progressWidth, height,
+                    drawRoundedRect(cr, 0, 0, progressWidth, height,
                         Math.min(this._radius, progressWidth / 2));
                     if (this._activityColor)
                         cr.setSourceRGBA(...this._activityColor);
@@ -343,7 +342,7 @@ class BarBackground extends St.DrawingArea {
                         // Darker diagonal stripes over the completed part,
                         // scrolling slowly while the task runs.
                         cr.save();
-                        makeRoundedRectPath(cr, progressWidth, height,
+                        drawRoundedRect(cr, 0, 0, progressWidth, height,
                             Math.min(this._radius, progressWidth / 2));
                         cr.clip();
                         cr.setLineWidth(2);
@@ -373,8 +372,7 @@ class BarBackground extends St.DrawingArea {
                 gradient.addColorStopRGBA(0.5, 0.55, 0.82, 1.0, 1.0);
                 gradient.addColorStopRGBA(1, 0.60, 0.35, 1.0, 0.10);
                 cr.save();
-                cr.translate(1, 1);
-                makeRoundedRectPath(cr, width - 2, height - 2,
+                drawRoundedRect(cr, 1, 1, width - 2, height - 2,
                     Math.max(1, this._radius));
                 cr.setSource(gradient);
                 cr.setLineWidth(2);

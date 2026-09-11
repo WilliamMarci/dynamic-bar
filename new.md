@@ -152,9 +152,11 @@
 
 ## K. 统一控件复测（第 4 轮）
 
-- [ ] Timer、Live Activity 与 Media 的 island 进度条宽度均为同一标准宽度，轨道高度、圆角、透明度与缓动一致，内容不越过 island 左右边界。
-- [ ] Media 的共享进度条仍可拖动 seek；不可 seek 时仅变为只读，不改变尺寸。
+- [ ] Media 与新增卡片已改用同一进度条底层；重构后的 Media 仍保持原来的白色圆角视觉、4/6px 状态高度和 seek，新增卡片以此为基准且不越过 island 边界。
+- [ ] Media 可拖动时仍能 seek；不可 seek 时仍按原设计只读显示。
 - [ ] Activity dot hover 约 320ms 后，底部 dynamic bar 从 0 生长到对应进度；鼠标停留期间保持，移开后恢复原进度。
 - [ ] Timer running 只显示 Pause/Skip/End，paused 只显示 Resume/Skip/End；完成后不显示运行控制。
 - [ ] Activity 动作均为圆形图标按钮，常态透明，hover/focus 才显示背景与文字提示；危险按钮第一次点击改为警告图标，第二次才执行。
 - [ ] Timer、Live Activity、Removable、Printing 卡片使用相同的标题/百分比/动作头部和下方全宽进度条节奏，不再出现单行内容横向溢出。
+- [ ] Timer/Activity 的底部 dynamic bar 使用主题色填充和暗色斜纹；running 时斜纹移动，paused 时进度与斜纹位置均冻结。
+- [ ] 点击 Activity dot 切换到 Timer 卡片后，底部 dynamic bar 仍显示该 Timer 的主题色动态斜纹进度，但 bar 宽度、高度和位置不发生额外变化。

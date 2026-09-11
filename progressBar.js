@@ -52,6 +52,7 @@ export function createProgressBar(params = {}) {
         fraction: 0,
         indeterminate: params.indeterminate ?? false,
         striped: params.striped ?? false,
+        stripeAnimated: params.stripeAnimated ?? true,
         phase: 0,
         stripePhase: 0,
         timerId: 0,
@@ -195,7 +196,7 @@ export function createProgressBar(params = {}) {
     });
 
     const syncStripe = () => {
-        if (state.striped && !state.stripeTimerId) {
+        if (state.striped && state.stripeAnimated && !state.stripeTimerId) {
             state.stripeTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50,
                 () => {
                     state.stripePhase = (state.stripePhase + 0.5) % 8;
@@ -207,8 +208,9 @@ export function createProgressBar(params = {}) {
             state.stripeTimerId = 0;
         }
     };
-    area.setStriped = value => {
+    area.setStriped = (value, {animate = true} = {}) => {
         state.striped = Boolean(value);
+        state.stripeAnimated = animate;
         syncStripe();
         area.queue_repaint();
     };

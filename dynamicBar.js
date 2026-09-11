@@ -554,7 +554,18 @@ export const DynamicBar = GObject.registerClass({
 
     setActivity(id, activity) {
         if (activity) {
-            this._activities.set(id, activity === true ? {} : activity);
+            const state = activity === true ? {} : activity;
+            this._activities.set(id, state);
+            if (this._activityPinnedId === id) {
+                const status = state.status ?? 'running';
+                const value = Number.isFinite(state.progress)
+                    ? state.progress : 0.35;
+                this._bar.setPinnedActivityPreview(value, {
+                    color: this._parseColor(this._activityDotColor(status)),
+                    striped: true,
+                    animateStripes: status !== 'paused',
+                });
+            }
         } else {
             if (this._activityPinnedId === id) {
                 this._activityPinnedId = null;
@@ -713,7 +724,8 @@ export const DynamicBar = GObject.registerClass({
                             hoverRing.visible = true;
                             const preview = Number.isFinite(state.progress)
                                 ? state.progress : 0.35;
-                            this.previewActivityProgress(preview, color);
+                            this.previewActivityProgress(preview, color,
+                                status !== 'paused');
                             visual.ease({
                                 scale_x: options.activityDotHoverScale,
                                 scale_y: options.activityDotHoverScale,
@@ -744,10 +756,15 @@ export const DynamicBar = GObject.registerClass({
                     this.toggleActivityPin(activityId, state);
                     return Clutter.EVENT_STOP;
                 }
-                if (Number.isFinite(state.progress))
-                    this.previewActivityProgress(state.progress, color);
                 state.onClick?.(activityId);
                 this.expandPrimary();
+                // Expansion normally restores the plain bar. Apply the
+                // selected activity preview afterwards so switching to the
+                // Timer card changes only paint, never bar geometry.
+                const preview = Number.isFinite(state.progress)
+                    ? state.progress : 0.35;
+                this.previewActivityProgress(preview, color,
+                    status !== 'paused');
                 return Clutter.EVENT_STOP;
             });
             this._activityBox.add_child(holder);
@@ -767,17 +784,19 @@ export const DynamicBar = GObject.registerClass({
                 color: this._parseColor(this._activityDotColor(
                     state.status ?? 'running')),
                 striped: true,
+                animateStripes: state.status !== 'paused',
             });
         }
         this._rebuildDots();
     }
 
-    previewActivityProgress(progress, color = null) {
+    previewActivityProgress(progress, color = null, animateStripes = true) {
         if (this._activityPreviewTimerId)
             GLib.source_remove(this._activityPreviewTimerId);
         this._bar.setActivityPreview(progress, {
             color: this._parseColor(color),
             striped: true,
+            animateStripes,
         });
         // Keep previewing while the pointer lingers on the activity dots.
         const tick = () => {

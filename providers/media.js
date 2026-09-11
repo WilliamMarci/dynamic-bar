@@ -6,9 +6,7 @@ import St from 'gi://St';
 import {BarProvider, smallNotificationHeight, smallNotificationLabel}
     from '../provider.js';
 import {MprisService} from '../services/mprisService.js';
-import {createIconButton} from '../controls.js';
-import {createProgressBar, ISLAND_PROGRESS_HEIGHT, ISLAND_PROGRESS_WIDTH}
-    from '../progressBar.js';
+import {createProgressBar, ISLAND_PROGRESS_WIDTH} from '../progressBar.js';
 
 export class MediaProvider extends BarProvider {
     constructor(bar, settings, launcherProvider = null, liveActivityProvider = null) {
@@ -205,15 +203,16 @@ export class MediaProvider extends BarProvider {
     }
 
     _button(iconName, callback) {
-        const names = {
-            'media-skip-backward-symbolic': 'Previous',
-            'media-skip-forward-symbolic': 'Next',
-        };
-        return createIconButton({iconName, tooltip: names[iconName] ?? 'Media action',
-            iconSize: 18, onClicked: () => {
+        const button = new St.Button({
+            style_class: 'dynamic-bar-media-button',
+            can_focus: true,
+            child: new St.Icon({icon_name: iconName, icon_size: 18}),
+        });
+        button.connect('clicked', () => {
             this.bar.holdOpen(1800);
             callback();
-        }});
+        });
+        return button;
     }
 
     _createCover() {
@@ -246,7 +245,7 @@ export class MediaProvider extends BarProvider {
         if (fraction === null)
             return;
         this._seekPreview = fraction;
-        area.queue_repaint();
+        area.setProgress(fraction, {animate: false});
         this.bar.holdOpen(1800);
     }
 
@@ -260,7 +259,7 @@ export class MediaProvider extends BarProvider {
         if (fraction !== null)
             this._service?.seekTo(fraction);
         this._seekPreview = null;
-        area.queue_repaint();
+        area.setProgress(this._progress, {animate: false});
         return Clutter.EVENT_STOP;
     }
 
@@ -272,7 +271,7 @@ export class MediaProvider extends BarProvider {
                 : 'dynamic-bar-media-progress',
             reactive: this._canSeek,
             width: ISLAND_PROGRESS_WIDTH,
-            height: ISLAND_PROGRESS_HEIGHT,
+            height: this._canSeek ? 6 : 4,
             trackAlpha: options.trackAlpha,
             progressAlpha: options.progressAlpha,
             fillColor: [1, 1, 1],
@@ -375,17 +374,19 @@ export class MediaProvider extends BarProvider {
         });
         controlButtons.add_child(this._button('media-skip-backward-symbolic',
             () => this._call('Previous')));
-        const playIconName = this._playing
-            ? 'media-playback-pause-symbolic'
-            : 'media-playback-start-symbolic';
-        const playButton = createIconButton({
-            iconName: playIconName,
-            tooltip: this._playing ? 'Pause' : 'Play',
-            iconSize: 18,
-            onClicked: () => {
-                this.bar.holdOpen(1800);
-                this._call('PlayPause');
-            },
+        const playIcon = new St.Icon({
+            icon_name: this._playing
+                ? 'media-playback-pause-symbolic'
+                : 'media-playback-start-symbolic',
+            icon_size: 18,
+        });
+        const playButton = new St.Button({
+            style_class: 'dynamic-bar-media-button', can_focus: true,
+            child: playIcon,
+        });
+        playButton.connect('clicked', () => {
+            this.bar.holdOpen(1800);
+            this._call('PlayPause');
         });
         controlButtons.add_child(playButton);
         controlButtons.add_child(this._button('media-skip-forward-symbolic',
@@ -409,8 +410,7 @@ export class MediaProvider extends BarProvider {
         top.add_child(info);
         box.add_child(top);
 
-        this._islandRefs = {title, subtitle, progress,
-            playIcon: playButton.child, source};
+        this._islandRefs = {title, subtitle, progress, playIcon, source};
         progress.queue_repaint();
         return box;
     }
@@ -444,7 +444,7 @@ export class MediaProvider extends BarProvider {
         refs.progress.style_class = this._canSeek
             ? 'dynamic-bar-media-progress dynamic-bar-media-progress-seekable'
             : 'dynamic-bar-media-progress';
-        refs.progress.set_height(ISLAND_PROGRESS_HEIGHT);
+        refs.progress.set_height(this._canSeek ? 6 : 4);
         refs.progress.setProgress(this._progress, {animate: true});
         this.bar.refresh();
     }
