@@ -161,3 +161,13 @@
 - [ ] Timer/Activity 的底部 dynamic bar 使用主题色填充和暗色斜纹；running 时斜纹移动，paused 时进度与斜纹位置均冻结。
 - [ ] 点击 Activity dot 切换到 Timer 卡片后，底部 dynamic bar 仍显示该 Timer 的主题色动态斜纹进度，但 bar 宽度、高度和位置不发生额外变化。
 - [ ] `barBackground.js` 与 `progressBar.js` 没有绘制依赖；dynamic bar 和 island progress 分别维护自己的 actor、绘制路径与动画状态。
+
+## L. 紧凑列表、边界与错误处理（第 5 轮）
+
+- [ ] Activity、Timer、Device、Printing 每个条目均为单行 `title | progress | value | actions`，各列中线对齐。
+- [ ] 每个 page 按自然宽度驱动 island 宽度；切换宽窄 page 时 island 重新测量，所有 hover 背景、进度条和按钮均位于可见背景内。
+- [ ] 专用 Timer/Device/Printing 任务不在总 Activity page 重复出现；只有 Timer 时只有一个分页圆点。
+- [ ] Stop tracking 可删除最后一个条目；对应 page 消失，没有其他卡片时立即显示 Launcher。
+- [ ] Launcher 能容错解析简写 desktop ID（例如 `Nautilus.desktop`），优先显示 Desktop 图标；无效 desktop ID、自定义图标和启动失败均写入 journal。
+- [ ] 鼠标位于 island 背景、任意卡片内容、按钮或控制条时不会触发自动收回。
+- [ ] `journalctl --user -o cat /usr/bin/gnome-shell | grep '\[Dynamic Bar\]'` 能看到带模块与上下文的错误，而不是静默失败。

@@ -8,6 +8,7 @@ import {BarProvider, smallNotificationHeight, smallNotificationLabel}
 import {createIconButton} from '../controls.js';
 import {createProgressBar, ISLAND_PROGRESS_HEIGHT, ISLAND_PROGRESS_WIDTH}
     from '../progressBar.js';
+import {logError, logWarning} from '../log.js';
 
 function colorToRgb(value) {
     const text = String(value || '').trim();
@@ -55,7 +56,8 @@ function safeJson(text, fallback = {}) {
     try {
         const value = JSON.parse(text);
         return value && typeof value === 'object' ? value : fallback;
-    } catch {
+    } catch (error) {
+        logWarning('Activity', `Invalid JSON payload: ${error.message}`);
         return fallback;
     }
 }
@@ -77,6 +79,7 @@ export class LiveActivityProvider extends BarProvider {
         this._flashId = null;
         this._flashTimerId = 0;
         this._cardSignature = '';
+        this._cardsChangedId = 0;
         this._load();
         this._dbus = Gio.DBusExportedObject.wrapJSObject(XML, this);
         this._dbus.export(Gio.DBus.session, LIVE_OBJECT_PATH);
@@ -216,8 +219,12 @@ export class LiveActivityProvider extends BarProvider {
     }
 
     Dismiss(id) {
-        if (!this._tasks.delete(id)) return;
+        if (!this._tasks.delete(id)) {
+            logWarning('Activity', 'Dismiss ignored because id was not found', id);
+            return;
+        }
         this._internalCallbacks.delete(id);
+        console.log(`[Dynamic Bar][Activity] dismissed ${id}`);
         this._changed();
     }
 
@@ -248,11 +255,20 @@ export class LiveActivityProvider extends BarProvider {
         this._persist();
         for (const listener of this._listeners) listener();
         const signature = this.getCards().map(card => card.id).join('|');
-        if (signature !== this._cardSignature) {
-            this._cardSignature = signature;
-            this.bar.cardsChanged();
-        } else if (this.bar.isShown(this)) {
-            this.bar.cardsChanged();
+        const visible = this.bar.isShown(this);
+        if (signature === this._cardSignature && !visible)
+            return;
+        this._cardSignature = signature;
+        // Never destroy the clicked row from inside its own event callback.
+        // Coalesce timer bursts and rebuild after event dispatch completes.
+        if (!this._cardsChangedId) {
+            this._cardsChangedId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE,
+                () => {
+                    this._cardsChangedId = 0;
+                    try { this.bar.cardsChanged(); }
+                    catch (error) { logError('Activity', error, 'refresh cards'); }
+                    return GLib.SOURCE_REMOVE;
+                });
         }
     }
 
@@ -280,7 +296,7 @@ export class LiveActivityProvider extends BarProvider {
                     icon: action.icon, dangerous: action.dangerous})) ?? []}));
             this._stateFile.replace_contents(JSON.stringify(metadata), null, false,
                 Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-        } catch (error) { console.error(`Dynamic Bar activity persistence failed: ${error}`); }
+        } catch (error) { logError('Activity', error, 'persist metadata'); }
     }
 
     _load() {
@@ -292,7 +308,10 @@ export class LiveActivityProvider extends BarProvider {
                 if (!TERMINAL_STATES.has(stored.status)) stored.status = 'orphaned';
                 this._tasks.set(stored.id, stored);
             }
-        } catch {}
+        } catch (error) {
+            if (error.code !== Gio.IOErrorEnum.NOT_FOUND)
+                logError('Activity', error, 'restore metadata');
+        }
     }
 
     _notifySmall(text) {
@@ -335,14 +354,19 @@ export class LiveActivityProvider extends BarProvider {
     getCards() {
         if (!this.hasActivities)
             return [];
-        const cards = [{
-            id: 'live-activities',
-            createActor: () => this._createList(() => true),
-            onDestroy: () => {},
-        }];
+        const cards = [];
+        const layout = {paddingX: 16, paddingY: 8};
+        const specialized = task => task.group === 'timer' ||
+            task.group === 'removable' || task.type === 'print';
+        if (this._hasTasks(task => !specialized(task))) {
+            cards.push({id: 'live-activities', layout,
+                createActor: () => this._createList(task => !specialized(task)),
+                onDestroy: () => {}});
+        }
         if (this._hasTasks(task => task.group === 'timer')) {
             cards.push({
                 id: 'timer',
+                layout,
                 createActor: () => this._createList(task => task.group === 'timer'),
                 onDestroy: () => {},
             });
@@ -350,6 +374,7 @@ export class LiveActivityProvider extends BarProvider {
         if (this._hasTasks(task => task.group === 'removable')) {
             cards.push({
                 id: 'removable',
+                layout,
                 createActor: () => this._createList(task => task.group === 'removable'),
                 onDestroy: () => {},
             });
@@ -357,6 +382,7 @@ export class LiveActivityProvider extends BarProvider {
         if (this._hasTasks(task => task.type === 'print')) {
             cards.push({
                 id: 'printing',
+                layout,
                 createActor: () => this._createList(task => task.type === 'print'),
                 onDestroy: () => {},
             });
@@ -387,8 +413,6 @@ export class LiveActivityProvider extends BarProvider {
                 (a.some(held) ? 100 : 0)) ||
             Math.max(...b.map(task => task.priority)) - Math.max(...a.map(task => task.priority)));
         for (const [group, tasks] of ordered) {
-            if (tasks.length > 1) list.add_child(new St.Label({
-                text: `${group} · ${tasks.length}`, style_class: 'dynamic-bar-live-group'}));
             tasks.sort((a, b) => (rank(b.status) + (held(b) ? 100 : 0)) -
                 (rank(a.status) + (held(a) ? 100 : 0)) ||
                 b.priority - a.priority || b.updatedAt - a.updatedAt);
@@ -539,7 +563,7 @@ export class LiveActivityProvider extends BarProvider {
     }
 
     _createRow(task) {
-        // Shared card rhythm: metadata/actions first, full-width progress below.
+        // Compact list contract: title | progress | value | context actions.
         const classes = ['dynamic-bar-live-row'];
         if (task.id === this._flashId)
             classes.push('flash');
@@ -549,13 +573,6 @@ export class LiveActivityProvider extends BarProvider {
             style_class: classes.join(' '),
             reactive: true,
             track_hover: true,
-            vertical: true,
-            width: ISLAND_PROGRESS_WIDTH + 14,
-        });
-
-        const header = new St.BoxLayout({
-            style_class: 'dynamic-bar-live-row-content',
-            x_expand: true,
         });
 
         const title = new St.Label({
@@ -567,10 +584,11 @@ export class LiveActivityProvider extends BarProvider {
         });
         if (task.summary)
             title.accessible_name = task.summary;
-        header.add_child(title);
+        row.add_child(title);
 
         const {actor: progress, label} = this._createProgress(task);
-        header.add_child(new St.Label({
+        row.add_child(progress);
+        row.add_child(new St.Label({
             text: label,
             style_class: 'dynamic-bar-live-percent',
             x_align: Clutter.ActorAlign.END,
@@ -595,10 +613,7 @@ export class LiveActivityProvider extends BarProvider {
             onClicked: () => this.Dismiss(task.id),
         });
         controls.add_child(untrack);
-        header.add_child(controls);
-        row.add_child(header);
-        progress.x_align = Clutter.ActorAlign.CENTER;
-        row.add_child(progress);
+        row.add_child(controls);
 
         row.connect('button-press-event', () => {
             // Keep the user's card near the top for a short while so a
@@ -626,7 +641,8 @@ export class LiveActivityProvider extends BarProvider {
                     break;
                 const fields = text.slice(end + 2).split(' ');
                 current = Number(fields[1]) || 0;
-            } catch {
+            } catch (error) {
+                logWarning('Activity', `Cannot inspect process ${current}: ${error.message}`);
                 break;
             }
         }
@@ -648,12 +664,14 @@ export class LiveActivityProvider extends BarProvider {
         try {
             target.meta_window.activate(global.get_current_time());
             return true;
-        } catch {
+        } catch (error) {
+            logError('Activity', error, `activate terminal for ${pid}`);
             return false;
         }
     }
 
     destroy() {
+        if (this._cardsChangedId) GLib.source_remove(this._cardsChangedId);
         if (this._cleanupId) GLib.source_remove(this._cleanupId);
         for (const timer of this._timers.values()) {
             if (timer.sourceId) GLib.source_remove(timer.sourceId);

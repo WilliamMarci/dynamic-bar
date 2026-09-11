@@ -1,6 +1,8 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
+import {logError} from '../log.js';
+
 const DBUS = 'org.freedesktop.DBus';
 const DBUS_PATH = '/org/freedesktop/DBus';
 const PREFIX = 'org.mpris.MediaPlayer2.';
@@ -29,6 +31,7 @@ export class MprisService {
         this._bus = Gio.DBus.session;
         this._players = new Map();
         this._listeners = new Set();
+        this._loggedErrors = new Set();
         this._activeName = null;
         this._destroyed = false;
         this._lastLogKey = null;
@@ -62,7 +65,8 @@ export class MprisService {
         try {
             endpoint?.player.call_sync(method, null,
                 Gio.DBusCallFlags.NONE, 500, null);
-        } catch {
+        } catch (error) {
+            this._logOnce(`call:${method}`, error);
         }
     }
 
@@ -122,7 +126,8 @@ export class MprisService {
                 if (!names.includes(name))
                     this._remove(name);
             }
-        } catch {
+        } catch (error) {
+            this._logOnce('discover', error);
         }
     }
 
@@ -130,7 +135,8 @@ export class MprisService {
         try {
             return Gio.DBusProxy.new_for_bus_sync(Gio.BusType.SESSION,
                 Gio.DBusProxyFlags.NONE, null, name, PATH, iface, null);
-        } catch {
+        } catch (error) {
+            this._logOnce(`proxy:${name}:${iface}`, error);
             return null;
         }
     }
@@ -208,9 +214,17 @@ export class MprisService {
                 new GLib.Variant('(ss)', [PLAYER_IFACE, 'Position']),
                 new GLib.VariantType('(v)'), Gio.DBusCallFlags.NONE, 300, null);
             return Number(reply.recursiveUnpack()[0]) / 1e6;
-        } catch {
+        } catch (error) {
+            this._logOnce(`position:${name}`, error);
             return 0;
         }
+    }
+
+    _logOnce(key, error) {
+        if (this._loggedErrors.has(key))
+            return;
+        this._loggedErrors.add(key);
+        logError('MPRIS', error, key);
     }
 
     _publish() {

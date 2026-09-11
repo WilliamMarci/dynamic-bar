@@ -1,4 +1,3 @@
-import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -35,7 +34,6 @@ export function createIconButton({iconName, tooltip, destructive = false,
     };
     button.connect('notify::hover', () => button.hover ? showTip() : hideTip());
     button.connect('destroy', hideTip);
-    button.connect('button-press-event', () => Clutter.EVENT_STOP);
     if (onClicked)
         button.connect('clicked', onClicked);
     button.setActionIcon = name => { icon.icon_name = name; };

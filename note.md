@@ -167,3 +167,7 @@ Dynamic bar 与 island 内的 progress bar 是两个内部差异很大的独立�
 Activity dot 的 hover 与点击属于统一的进度预览入口：hover 延迟触发后，底部 dynamic bar 从 0 生长到该 Activity 当前进度，并在指针仍停留于圆点区时保持；Activity 已完成部分使用主题色填充并覆盖主题色对应的暗色动态斜纹。running 时斜纹移动，paused 时保留在当前位置但停止移动。Shift+点击仍用于持久固定，普通点击用于打开并聚焦对应卡片。
 
 通过 Activity dot 切换到 Timer 卡片时，必须在卡片展开完成后再应用 Activity bar 绘制，避免展开流程把它覆盖成普通白条。这里只切换主题色进度与动态斜纹，不改变 dynamic bar 当时的宽度、高度和水平位置。
+
+Activity、Timer、Removable 和 Printing page 使用紧凑单行：`title | progress | value | actions`。Page 不采用统一固定宽度；每个 page 的自然宽度加自身 `paddingX` 决定 island 目标宽度，切页后重新测量并动画调整。内容必须避开顶部融合圆角，hover/按钮边框不得绘制到 island 可见背景之外。专用任务只进入对应 page，不能同时重复出现在总 Activity page。
+
+Stop tracking 必须能删除最后一项；最后一项消失后对应 page 立即从 deck 移除，若没有其他卡片则回退到 Launcher。Island 自动收回必须同时检查背景、内容 holder 和 bar 的 hover，鼠标位于任何 island 内容上时不得收回。可恢复错误统一用 `[Dynamic Bar][模块]` 结构写入 GNOME Shell journal，并携带对象 ID 或配置项上下文，禁止吞掉解析、图标、卡片创建和设备操作异常。

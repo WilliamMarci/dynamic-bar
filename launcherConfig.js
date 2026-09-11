@@ -1,3 +1,5 @@
+import {logError} from './log.js';
+
 export function getLauncherItems(settings) {
     try {
         const parsed = JSON.parse(settings.get_string('launcher-items'));
@@ -6,7 +8,8 @@ export function getLauncherItems(settings) {
         if (Array.isArray(parsed) && (parsed.length > 0 ||
             settings.get_user_value('launcher-items') !== null))
             return parsed.map(normalizeItem);
-    } catch {
+    } catch (error) {
+        logError('LauncherConfig', error, 'parse launcher-items');
     }
     return settings.get_strv('launcher-apps').map(desktopId =>
         normalizeItem({desktopId}));

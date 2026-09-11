@@ -2,6 +2,7 @@ import Gio from 'gi://Gio';
 import St from 'gi://St';
 
 import {BarProvider} from '../provider.js';
+import {logError} from '../log.js';
 
 export class RemovableProvider extends BarProvider {
     constructor(bar, settings, activities) {
@@ -76,6 +77,7 @@ export class RemovableProvider extends BarProvider {
                 (object, result) => {
                     try { object.eject_with_operation_finish(result); }
                     catch (error) { this._requested.delete(id);
+                        logError('Removable', error, `eject ${id}`);
                         this._activities.updateInternal(id, {status: 'error', summary: String(error)}); }
                 });
         } else {
@@ -83,6 +85,7 @@ export class RemovableProvider extends BarProvider {
                 (object, result) => {
                     try { object.unmount_with_operation_finish(result); }
                     catch (error) { this._requested.delete(id);
+                        logError('Removable', error, `unmount ${id}`);
                         this._activities.updateInternal(id, {status: 'error', summary: String(error)}); }
                 });
         }

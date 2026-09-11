@@ -7,6 +7,7 @@ import {BarProvider, smallNotificationHeight, smallNotificationLabel}
     from '../provider.js';
 import {MprisService} from '../services/mprisService.js';
 import {createProgressBar, ISLAND_PROGRESS_WIDTH} from '../progressBar.js';
+import {logError} from '../log.js';
 
 export class MediaProvider extends BarProvider {
     constructor(bar, settings, launcherProvider = null, liveActivityProvider = null) {
@@ -227,7 +228,8 @@ export class MediaProvider extends BarProvider {
                 icon_size: 60,
                 style_class: 'dynamic-bar-media-cover',
             });
-        } catch {
+        } catch (error) {
+            logError('Media', error, `cover ${artUrl}`);
             return null;
         }
     }

@@ -3,6 +3,8 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
+import {logError} from './log.js';
+
 function makeChevron() {
     const area = new St.DrawingArea();
     area.set_size(16, 16);
@@ -135,6 +137,7 @@ export class IslandCardDeck {
         this._cardHolder = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
+            clip_to_allocation: true,
         });
         this._root.add_child(this._cardHolder);
 
@@ -185,7 +188,7 @@ export class IslandCardDeck {
             try {
                 this._attachedActor = this._attached.createActor();
             } catch (error) {
-                console.error(`Dynamic Bar attached page failed: ${error}`);
+                logError('CardDeck', error, `attached ${this._attached.id}`);
                 this._attachedActor = null;
             }
             if (this._attachedActor) {
@@ -237,7 +240,7 @@ export class IslandCardDeck {
         try {
             this._cardActor = this._cards[index].createActor?.() ?? null;
         } catch (error) {
-            console.error(`Dynamic Bar card "${this._cards[index].id}" failed: ${error}`);
+            logError('CardDeck', error, `card ${this._cards[index].id}`);
             this._cardActor = new St.Label({
                 text: `Failed to load ${this._cards[index].id}`,
                 style_class: 'dynamic-bar-live-summary',
@@ -251,6 +254,16 @@ export class IslandCardDeck {
             }
             this._cardActor.x_align = Clutter.ActorAlign.CENTER;
             this._cardHolder.add_child(this._cardActor);
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                if (!this._cardActor?.get_parent())
+                    return GLib.SOURCE_REMOVE;
+                const [, naturalWidth] = this._cardActor.get_preferred_width(-1);
+                if (this._cardHolder.width > 0 &&
+                    naturalWidth > this._cardHolder.width + 1)
+                    logError('CardDeck', `natural width ${naturalWidth}px exceeds ` +
+                        `holder ${this._cardHolder.width}px`, this._cards[index].id);
+                return GLib.SOURCE_REMOVE;
+            });
         }
     }
 

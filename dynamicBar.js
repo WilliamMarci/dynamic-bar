@@ -9,6 +9,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {BarBackground, IslandBackground} from './barBackground.js';
 import {DynamicBarApi} from './api.js';
 import {IslandCardDeck} from './cardDeck.js';
+import {logError} from './log.js';
 import {findPanelStyleActor, readPanelColor,
     readPanelTransitionDuration} from './panelStyle.js';
 
@@ -129,6 +130,8 @@ export const DynamicBar = GObject.registerClass({
         this._islandHolder = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
             clip_to_allocation: true,
+            reactive: true,
+            track_hover: true,
         });
         this._actor.add_child(this._islandHolder);
 
@@ -158,6 +161,8 @@ export const DynamicBar = GObject.registerClass({
                 this._syncIslandHolder();
             },
             this);
+        this._islandHolder.connectObject(
+            'notify::hover', () => this._onHoverChanged(), this);
         this._bar.connectObject(
             'notify::hover', () => this._onHoverChanged(),
             'notify::allocation', () => this._syncBarDependents(),
@@ -248,7 +253,7 @@ export const DynamicBar = GObject.registerClass({
             try {
                 list = provider.getCards?.() ?? [];
             } catch (error) {
-                console.error(`Dynamic Bar provider cards failed: ${error}`);
+                logError('Cards', error, provider.constructor?.name ?? 'provider');
                 continue;
             }
             for (const card of list) {
@@ -278,6 +283,7 @@ export const DynamicBar = GObject.registerClass({
         return {
             paddingX: 0,
             paddingY: Math.max(layout.paddingY ?? 10,
+                this._options.islandTopRadius,
                 this._deckAttachedExpanded ? 10 : 0),
             minWidth: layout.minWidth,
             minHeight: layout.minHeight,
@@ -1081,8 +1087,8 @@ export const DynamicBar = GObject.registerClass({
     }
 
     _onHoverChanged() {
-        const hovered = this._bar.hover ||
-            (this._expanded && this._island.hover);
+        const hovered = this._bar.hover || (this._expanded &&
+            (this._island.hover || this._islandHolder.hover));
         if (hovered === this._hovered)
             return;
 
@@ -1122,6 +1128,9 @@ export const DynamicBar = GObject.registerClass({
         this._collapseTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay,
             () => {
                 this._collapseTimerId = 0;
+                if (this._expanded && (this._bar.hover || this._island.hover ||
+                    this._islandHolder.hover))
+                    return GLib.SOURCE_REMOVE;
                 this.collapse();
                 return GLib.SOURCE_REMOVE;
             });
@@ -1268,7 +1277,8 @@ export const DynamicBar = GObject.registerClass({
             try {
                 actor = provider.createIslandActor();
             } catch (error) {
-                console.error(`Dynamic Bar provider failed to create content: ${error}`);
+                logError('Island', error,
+                    provider.constructor?.name ?? 'provider content');
                 this._contentProvider = null;
                 this._providerLayout = null;
                 return false;

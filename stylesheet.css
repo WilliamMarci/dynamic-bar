@@ -215,13 +215,10 @@
 }
 
 .dynamic-bar-live-row {
-    padding: 5px 7px;
+    spacing: 7px;
+    padding: 4px 0;
     border-radius: 7px;
     background-color: transparent;
-}
-
-.dynamic-bar-live-row-content {
-    spacing: 6px;
 }
 
 .dynamic-bar-live-row:hover {
