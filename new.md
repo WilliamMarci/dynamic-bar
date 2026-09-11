@@ -165,7 +165,7 @@
 ## L. 紧凑列表、边界与错误处理（第 5 轮）
 
 - [ ] Activity、Timer、Device、Printing 每个条目均为单行 `title | progress | value | actions`，各列中线对齐。
-- [ ] Media/Activity/Timer/Device/Printing page 使用统一的 `Card page width`；notification、small notification、Launcher 等仍按当前内容让 island 动态改变宽度，所有 hover 背景、进度条和按钮均位于可见背景内。
+- [ ] 常驻 page 宽度可在 200–500px 调整；Activity 行按约 25% 标题、43% 进度、最多 5% 百分比、其余按钮排列；Media progress 保持可拖动 6px/兜底 4px。notification、small notification、Launcher 独立改变 island 宽度，所有 hover 背景、进度条和按钮均位于可见背景内。
 - [ ] 专用 Timer/Device/Printing 任务不在总 Activity page 重复出现；只有 Timer 时只有一个分页圆点。
 - [ ] Stop tracking 可删除最后一个条目；对应 page 消失，没有其他卡片时立即显示 Launcher。
 - [ ] Launcher 能容错解析简写 desktop ID（例如 `Nautilus.desktop`），优先显示 Desktop 图标；无效 desktop ID、自定义图标和启动失败均写入 journal。

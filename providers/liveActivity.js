@@ -6,7 +6,7 @@ import St from 'gi://St';
 import {BarProvider, smallNotificationHeight, smallNotificationLabel}
     from '../provider.js';
 import {createIconButton} from '../controls.js';
-import {createProgressBar, ISLAND_PROGRESS_HEIGHT, ISLAND_PROGRESS_WIDTH}
+import {createProgressBar, ISLAND_PROGRESS_HEIGHT}
     from '../progressBar.js';
 import {logError, logWarning} from '../log.js';
 
@@ -224,6 +224,10 @@ export class LiveActivityProvider extends BarProvider {
             return;
         }
         this._internalCallbacks.delete(id);
+        const timer = this._timers.get(id);
+        if (timer?.sourceId)
+            GLib.source_remove(timer.sourceId);
+        this._timers.delete(id);
         console.log(`[Dynamic Bar][Activity] dismissed ${id}`);
         this._changed();
     }
@@ -306,9 +310,19 @@ export class LiveActivityProvider extends BarProvider {
             if (!ok) return;
             for (const stored of safeJson(new TextDecoder().decode(bytes), [])) {
                 if (!stored.id) continue;
+                if (stored.terminalPid > 0 &&
+                    !GLib.file_test(`/proc/${stored.terminalPid}`, GLib.FileTest.EXISTS)) {
+                    logWarning('Activity', 'Discarding stale local activity', stored.id);
+                    continue;
+                }
+                if (stored.expiresAt > 0 && now() >= stored.expiresAt)
+                    continue;
                 if (!TERMINAL_STATES.has(stored.status)) stored.status = 'orphaned';
+                if (stored.status === 'orphaned' && !stored.expiresAt)
+                    stored.expiresAt = now() + 300000;
                 this._tasks.set(stored.id, stored);
             }
+            this._persist();
         } catch (error) {
             if (error.code !== Gio.IOErrorEnum.NOT_FOUND)
                 logError('Activity', error, 'restore metadata');
@@ -356,7 +370,7 @@ export class LiveActivityProvider extends BarProvider {
         if (!this.hasActivities)
             return [];
         const cards = [];
-        const layout = {paddingX: 16, paddingY: 8};
+        const layout = {paddingX: 10, paddingY: 7};
         const specialized = task => task.group === 'timer' ||
             task.group === 'removable' || task.type === 'print';
         if (this._hasTasks(task => !specialized(task))) {
@@ -461,7 +475,7 @@ export class LiveActivityProvider extends BarProvider {
         const options = this.bar.presentation.options;
         const model = this._progressModel(task);
         const actor = createProgressBar({
-            width: ISLAND_PROGRESS_WIDTH,
+            width: Math.round(this._settings.get_int('card-page-width') * 0.43),
             height: ISLAND_PROGRESS_HEIGHT,
             style_class: 'dynamic-bar-progress',
             trackAlpha: options.trackAlpha,
@@ -583,18 +597,21 @@ export class LiveActivityProvider extends BarProvider {
             x_align: Clutter.ActorAlign.START,
             y_align: Clutter.ActorAlign.CENTER,
         });
+        title.set_width(Math.round(this._settings.get_int('card-page-width') * 0.25));
         if (task.summary)
             title.accessible_name = task.summary;
         row.add_child(title);
 
         const {actor: progress, label} = this._createProgress(task);
         row.add_child(progress);
-        row.add_child(new St.Label({
+        const percent = new St.Label({
             text: label,
             style_class: 'dynamic-bar-live-percent',
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,
-        }));
+        });
+        percent.set_width(Math.round(this._settings.get_int('card-page-width') * 0.05));
+        row.add_child(percent);
 
         const controls = new St.BoxLayout({
             style_class: 'dynamic-bar-live-actions',
@@ -622,7 +639,7 @@ export class LiveActivityProvider extends BarProvider {
             this._selectedId = task.id;
             this._selectedUntil = now() + 5000;
             this._activateTerminal(task.terminalPid);
-            return Clutter.EVENT_STOP;
+            return Clutter.EVENT_PROPAGATE;
         });
         return row;
     }

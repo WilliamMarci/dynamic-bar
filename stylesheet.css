@@ -159,8 +159,8 @@
 }
 
 .dynamic-bar-icon-button {
-    min-width: 28px;
-    min-height: 28px;
+    min-width: 22px;
+    min-height: 22px;
     padding: 0;
     border-radius: 999px;
     background-color: transparent;
@@ -215,8 +215,8 @@
 }
 
 .dynamic-bar-live-row {
-    spacing: 7px;
-    padding: 4px 0;
+    spacing: 5px;
+    padding: 2px 0;
     border-radius: 7px;
     background-color: transparent;
 }
@@ -256,12 +256,11 @@
 }
 
 .dynamic-bar-live-percent {
-    min-width: 32px;
-    font-size: 10px;
+    font-size: 8px;
 }
 
 .dynamic-bar-live-summary { font-size: 9px; color: rgba(255, 255, 255, 0.62); }
-.dynamic-bar-live-actions { spacing: 5px; }
+.dynamic-bar-live-actions { spacing: 2px; }
 .dynamic-bar-live-action {
     padding: 3px 7px;
     border-radius: 6px;

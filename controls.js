@@ -30,7 +30,6 @@ export function createIconButton({iconName, tooltip, destructive = false,
         const [, naturalHeight] = tip.get_preferred_height(naturalWidth);
         tip.set_position(Math.round(x + (button.width - naturalWidth) / 2),
             Math.round(y - naturalHeight - 6));
-        tip.raise_top();
     };
     button.connect('notify::hover', () => button.hover ? showTip() : hideTip());
     button.connect('destroy', hideTip);

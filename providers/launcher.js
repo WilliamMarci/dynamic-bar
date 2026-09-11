@@ -71,7 +71,7 @@ export class LauncherProvider extends BarProvider {
 
             let icon;
             if (item.iconMode === 'theme' && item.icon) {
-                icon = new St.Icon({icon_name: item.icon, icon_size: 26});
+                icon = new St.Icon({icon_name: item.icon, icon_size: 22});
             } else if (item.iconMode === 'custom' && item.icon) {
                 try {
                     const file = item.icon.startsWith('file://')
@@ -79,18 +79,22 @@ export class LauncherProvider extends BarProvider {
                         : Gio.File.new_for_path(item.icon);
                     icon = new St.Icon({
                         gicon: new Gio.FileIcon({file}),
-                        icon_size: 26,
+                        icon_size: 22,
                     });
                 } catch (error) {
                     logError('Launcher', error, `custom icon ${item.icon}`);
                     icon = null;
                 }
             }
-            icon ??= app?.create_icon_texture(26);
+            // create_icon_texture() can return an actor with a null internal
+            // icon on GNOME 50 and abort construction of the entire page.
+            const appInfo = app?.get_app_info?.() ?? null;
+            if (!icon && appInfo?.get_icon?.())
+                icon = new St.Icon({gicon: appInfo.get_icon(), icon_size: 22});
             if (!icon && info?.get_icon())
-                icon = new St.Icon({gicon: info.get_icon(), icon_size: 26});
+                icon = new St.Icon({gicon: info.get_icon(), icon_size: 22});
             icon ??= new St.Icon({icon_name: 'application-x-executable-symbolic',
-                icon_size: 26});
+                icon_size: 22});
             let child = icon;
             if (item.showName) {
                 child = new St.BoxLayout({vertical: true});

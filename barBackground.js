@@ -350,7 +350,8 @@ class BarBackground extends St.DrawingArea {
                     makeRoundedRectPath(cr, progressWidth, height,
                         Math.min(this._radius, progressWidth / 2));
                     if (this._activityColor)
-                        cr.setSourceRGBA(...this._activityColor);
+                        cr.setSourceRGBA(this._activityColor[0], this._activityColor[1],
+                            this._activityColor[2], this._progressAlpha);
                     else
                         cr.setSourceRGBA(1, 1, 1, this._progressAlpha);
                     cr.fill();

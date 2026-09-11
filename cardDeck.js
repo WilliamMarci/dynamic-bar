@@ -221,13 +221,8 @@ export class IslandCardDeck {
     }
 
     _pageWidth() {
-        try {
-            if (this._settings.settings_schema.has_key('card-page-width'))
-                return Math.max(420, this._settings.get_int('card-page-width'));
-        } catch (error) {
-            logError('CardDeck', error, 'read card-page-width');
-        }
-        return 520;
+        return Math.min(500, Math.max(200,
+            this._settings.get_int('card-page-width')));
     }
 
     destroy() {
@@ -257,10 +252,13 @@ export class IslandCardDeck {
             });
         }
         if (this._cardActor) {
-            // Persistent cards share one content width. The island itself is
-            // still measured from the current presentation, so notifications
-            // and attached pages remain naturally sized.
-            this._cardActor.set_width(this._pageWidth());
+            const cardActor = this._cardActor;
+            cardActor.connect('destroy', () => {
+                if (this._cardActor === cardActor)
+                    this._cardActor = null;
+            });
+            cardActor.set_width(this._pageWidth());
+            // Cards keep their compact feature-specific natural width.
             const paddingX = this._cards[index].layout?.paddingX ?? 0;
             if (paddingX > 0) {
                 this._cardActor.set_style(
@@ -269,9 +267,9 @@ export class IslandCardDeck {
             this._cardActor.x_align = Clutter.ActorAlign.CENTER;
             this._cardHolder.add_child(this._cardActor);
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                if (!this._cardActor?.get_parent())
+                if (this._cardActor !== cardActor)
                     return GLib.SOURCE_REMOVE;
-                const [, naturalWidth] = this._cardActor.get_preferred_width(-1);
+                const [, naturalWidth] = cardActor.get_preferred_width(-1);
                 if (this._cardHolder.width > 0 &&
                     naturalWidth > this._cardHolder.width + 1)
                     logError('CardDeck', `natural width ${naturalWidth}px exceeds ` +
@@ -283,9 +281,9 @@ export class IslandCardDeck {
 
     _destroyCard() {
         if (this._cardActor) {
-            this._cardHolder?.remove_child(this._cardActor);
-            this._cardActor.destroy();
+            const actor = this._cardActor;
             this._cardActor = null;
+            actor.destroy();
         }
         if (this._displayedIndex !== undefined) {
             this._cards[this._displayedIndex]?.onDestroy?.();
@@ -295,9 +293,9 @@ export class IslandCardDeck {
 
     _destroyAttached() {
         if (this._attachedActor) {
-            this._attachedHolder?.remove_child(this._attachedActor);
-            this._attachedActor.destroy();
+            const actor = this._attachedActor;
             this._attachedActor = null;
+            actor.destroy();
         }
         this._attached?.onDestroy?.();
         if (this._attachedHolder)
