@@ -65,7 +65,7 @@
       <description>Minimum height of the dynamic island in pixels.</description>
     </key>
     <key name="card-page-width" type="i">
-      <default>360</default>
+      <default>350</default>
       <range min="200" max="500"/>
       <summary>Persistent card page width</summary>
       <description>Shared compact width for persistent island pages.</description>

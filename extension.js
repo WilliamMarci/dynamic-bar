@@ -59,7 +59,8 @@ export default class DynamicBarExtension extends Extension {
             this._providers.push(new ChargingProvider(this._bar.api, this._settings));
 
         if (this._settings.get_boolean('bluetooth-enabled'))
-            this._providers.push(new BluetoothProvider(this._bar.api, this._settings));
+            this._providers.push(new BluetoothProvider(this._bar.api, this._settings,
+                liveActivity));
 
         if (this._settings.get_boolean('lock-keys-enabled'))
             this._providers.push(new LockKeysProvider(this._bar.api, this._settings));

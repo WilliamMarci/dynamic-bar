@@ -257,9 +257,8 @@ export class IslandCardDeck {
                 if (this._cardActor === cardActor)
                     this._cardActor = null;
             });
-            cardActor.set_width(this._pageWidth());
-            // Cards keep their compact feature-specific natural width.
             const paddingX = this._cards[index].layout?.paddingX ?? 0;
+            cardActor.set_width(Math.max(1, this._pageWidth() - paddingX * 2));
             if (paddingX > 0) {
                 this._cardActor.set_style(
                     `margin-left: ${paddingX}px; margin-right: ${paddingX}px;`);

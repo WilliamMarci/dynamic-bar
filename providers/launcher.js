@@ -21,7 +21,8 @@ export class LauncherProvider extends BarProvider {
     }
 
     getLayoutOptions() {
-        return {paddingX: 16, paddingY: 10};
+        return {paddingX: 16, paddingY: 10,
+            minWidth: this._settings.get_int('card-page-width')};
     }
 
     getAttachedPage() {

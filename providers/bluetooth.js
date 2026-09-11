@@ -5,11 +5,13 @@ import {BarProvider} from '../provider.js';
 
 const BLUEZ = 'org.bluez';
 const DEVICE_IFACE = 'org.bluez.Device1';
+const BATTERY_IFACE = 'org.bluez.Battery1';
 
 export class BluetoothProvider extends BarProvider {
-    constructor(bar, settings) {
+    constructor(bar, settings, activities = null) {
         super(bar);
         this._settings = settings;
+        this._activities = activities;
         this._devices = new Map();
         this._noticeName = '';
         this._noticeConnected = false;
@@ -22,7 +24,8 @@ export class BluetoothProvider extends BarProvider {
                 this._track(object, true);
             this._manager.connectObject('object-added', (_manager, object) =>
                 this._track(object, true), 'object-removed', (_manager, object) =>
-                this._untrack(object), this);
+                this._untrack(object), 'interface-added', (_manager, object, iface) =>
+                this._interfaceAdded(object, iface), this);
         } catch (error) {
             console.error(`Dynamic Bar Bluetooth unavailable: ${error}`);
         }
@@ -43,6 +46,8 @@ export class BluetoothProvider extends BarProvider {
         const path = object.get_object_path();
         const state = {
             proxy,
+            battery: object.get_interface(BATTERY_IFACE),
+            activityRegistered: false,
             name: this._property(proxy, 'Alias', this._property(proxy, 'Name', 'Bluetooth device')),
             connected: this._property(proxy, 'Connected', false),
         };
@@ -53,8 +58,12 @@ export class BluetoothProvider extends BarProvider {
                 return;
             state.connected = connected;
             this._notify(state.name, connected);
+            this._syncActivity(path, state);
         }, this);
+        state.battery?.connectObject('g-properties-changed', () =>
+            this._syncActivity(path, state), this);
         this._devices.set(path, state);
+        this._syncActivity(path, state);
         if (!initial && state.connected)
             this._notify(state.name, true);
     }
@@ -65,9 +74,55 @@ export class BluetoothProvider extends BarProvider {
         if (!state)
             return;
         state.proxy.disconnectObject(this);
+        state.battery?.disconnectObject(this);
         this._devices.delete(path);
+        if (state.activityRegistered)
+            this._activities?.Dismiss(this._activityId(path));
         if (state.connected)
             this._notify(state.name, false);
+    }
+
+    _interfaceAdded(object, iface) {
+        if (iface.g_interface_name !== BATTERY_IFACE)
+            return;
+        const path = object.get_object_path();
+        const state = this._devices.get(path);
+        if (!state || state.battery)
+            return;
+        state.battery = iface;
+        iface.connectObject('g-properties-changed', () =>
+            this._syncActivity(path, state), this);
+        this._syncActivity(path, state);
+    }
+
+    _activityId(path) {
+        return `bluetooth:${path}`;
+    }
+
+    _syncActivity(path, state) {
+        if (!this._activities || !state.connected || !state.battery) {
+            if (state.activityRegistered) {
+                this._activities?.Dismiss(this._activityId(path));
+                state.activityRegistered = false;
+            }
+            return;
+        }
+        const percentage = Number(this._property(state.battery, 'Percentage', 0));
+        const color = percentage <= 20 ? '#ed333b'
+            : percentage <= 50 ? '#ff9f0a' : '#33d17a';
+        const id = this._activityId(path);
+        const update = {progress: {kind: 'determinate', value: percentage / 100},
+            indicator: {kind: 'battery', icon: 'battery-symbolic', color},
+            summary: `${Math.round(percentage)}% battery`};
+        if (state.activityRegistered) {
+            this._activities.updateInternal(id, update);
+            return;
+        }
+        this._activities.registerInternal({id, title: state.name,
+            source: 'bluez', type: 'device', group: 'device', status: 'paused',
+            silentStart: true, heartbeat: false,
+            ...update, actions: []});
+        state.activityRegistered = true;
     }
 
     _notify(name, connected) {
@@ -108,7 +163,13 @@ export class BluetoothProvider extends BarProvider {
         this._manager?.disconnectObject(this);
         for (const state of this._devices.values())
             state.proxy.disconnectObject(this);
+        for (const [path, state] of this._devices) {
+            state.battery?.disconnectObject(this);
+            if (state.activityRegistered)
+                this._activities?.Dismiss(this._activityId(path));
+        }
         this._devices.clear();
         this._manager = null;
+        this._activities = null;
     }
 }

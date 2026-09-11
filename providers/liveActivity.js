@@ -6,8 +6,7 @@ import St from 'gi://St';
 import {BarProvider, smallNotificationHeight, smallNotificationLabel}
     from '../provider.js';
 import {createIconButton} from '../controls.js';
-import {createProgressBar, ISLAND_PROGRESS_HEIGHT}
-    from '../progressBar.js';
+import {createProgressBar} from '../progressBar.js';
 import {logError, logWarning} from '../log.js';
 
 function colorToRgb(value) {
@@ -169,6 +168,8 @@ export class LiveActivityProvider extends BarProvider {
             terminalPid: Number(input.terminalPid) || 0,
             summary: String(input.summary || ''), logPath: String(input.logPath || ''), exitCode: null,
             ring: typeof input.ring === 'string' ? input.ring : null,
+            indicator: input.indicator && typeof input.indicator === 'object'
+                ? input.indicator : null,
             createdAt: timestamp, updatedAt: timestamp,
             expiresAt: Number(input.expiresAt) || 0,
             // Provider-owned tasks can opt out of heartbeat expiry; a client
@@ -185,7 +186,8 @@ export class LiveActivityProvider extends BarProvider {
         const task = this._tasks.get(id);
         if (!task || TERMINAL_STATES.has(task.status)) return;
         const update = safeJson(payload);
-        for (const key of ['status', 'progress', 'summary', 'logPath', 'actions', 'priority']) {
+        for (const key of ['status', 'progress', 'summary', 'logPath', 'actions',
+            'priority', 'indicator']) {
             if (update[key] !== undefined) task[key] = update[key];
         }
         task.updatedAt = now();
@@ -372,7 +374,7 @@ export class LiveActivityProvider extends BarProvider {
         const cards = [];
         const layout = {paddingX: 10, paddingY: 7};
         const specialized = task => task.group === 'timer' ||
-            task.group === 'removable' || task.type === 'print';
+            task.group === 'device' || task.type === 'print';
         if (this._hasTasks(task => !specialized(task))) {
             cards.push({id: 'live-activities', layout,
                 createActor: () => this._createList(task => !specialized(task)),
@@ -386,11 +388,11 @@ export class LiveActivityProvider extends BarProvider {
                 onDestroy: () => {},
             });
         }
-        if (this._hasTasks(task => task.group === 'removable')) {
+        if (this._hasTasks(task => task.group === 'device')) {
             cards.push({
-                id: 'removable',
+                id: 'device',
                 layout,
-                createActor: () => this._createList(task => task.group === 'removable'),
+                createActor: () => this._createList(task => task.group === 'device'),
                 onDestroy: () => {},
             });
         }
@@ -475,15 +477,16 @@ export class LiveActivityProvider extends BarProvider {
         const options = this.bar.presentation.options;
         const model = this._progressModel(task);
         const actor = createProgressBar({
-            width: Math.round(this._settings.get_int('card-page-width') * 0.43),
-            height: ISLAND_PROGRESS_HEIGHT,
+            width: Math.round((this._settings.get_int('card-page-width') - 20) * 0.43),
+            height: 4,
             style_class: 'dynamic-bar-progress',
             trackAlpha: options.trackAlpha,
             progressAlpha: options.progressAlpha,
-            fillColor: colorToRgb(this._activityStatusColor(task.status)),
+            fillColor: colorToRgb(task.indicator?.color ??
+                this._activityStatusColor(task.status)),
             indeterminate: model.indeterminate,
-            striped: task.status === 'running' || task.status === 'warning' ||
-                task.status === 'paused',
+            striped: !task.indicator && (task.status === 'running' ||
+                task.status === 'warning' || task.status === 'paused'),
             stripeAnimated: task.status !== 'paused',
         });
         if (!model.indeterminate)
@@ -545,8 +548,8 @@ export class LiveActivityProvider extends BarProvider {
     _cardIdForGroup(group) {
         if (group === 'timer')
             return 'timer';
-        if (group === 'removable')
-            return 'removable';
+        if (group === 'device')
+            return 'device';
         if (String(group).startsWith('print'))
             return 'printing';
         return 'live-activities';
@@ -593,15 +596,21 @@ export class LiveActivityProvider extends BarProvider {
         const title = new St.Label({
             text: task.title,
             style_class: 'dynamic-bar-live-title',
-            x_expand: true,
+            x_expand: false,
             x_align: Clutter.ActorAlign.START,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        title.set_width(Math.round(this._settings.get_int('card-page-width') * 0.25));
+        const contentWidth = this._settings.get_int('card-page-width') - 20;
+        title.set_width(Math.round(contentWidth * 0.25));
         if (task.summary)
             title.accessible_name = task.summary;
         row.add_child(title);
 
+        if (task.indicator?.icon) {
+            row.add_child(new St.Icon({icon_name: task.indicator.icon,
+                icon_size: 13, style_class: 'dynamic-bar-device-icon',
+                y_align: Clutter.ActorAlign.CENTER}));
+        }
         const {actor: progress, label} = this._createProgress(task);
         row.add_child(progress);
         const percent = new St.Label({
@@ -610,7 +619,7 @@ export class LiveActivityProvider extends BarProvider {
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        percent.set_width(Math.round(this._settings.get_int('card-page-width') * 0.05));
+        percent.set_width(Math.round(contentWidth * 0.05));
         row.add_child(percent);
 
         const controls = new St.BoxLayout({

@@ -168,7 +168,7 @@ Activity dot 的 hover 与点击属于统一的进度预览入口：hover 延迟
 
 通过 Activity dot 切换到 Timer 卡片时，必须在卡片展开完成后再应用 Activity bar 绘制，避免展开流程把它覆盖成普通白条。这里只切换主题色进度与动态斜纹，不改变 dynamic bar 当时的宽度、高度和水平位置。
 
-Island 是迷你控件。常驻 page 使用 200–500px 的统一可调内容宽度（默认 360px），但 notification、small notification 与 Launcher 仍按自身内容独立改变 island 宽度。Activity、Timer、Removable、Device、Printing 等列表保持紧凑单行 `title | progress | value | actions`；Activity 行以约 25%/43%/最多 5%/剩余空间分配标题、进度条、可选百分比和圆形按钮。Media progress 必须保留 Git 历史中的语义尺寸：可拖动时 6px，不可拖动的兜底态 4px，不能用一个全局厚度覆盖。图标按钮默认约 22px、圆形、只在 hover 时显示提示；内容必须避开顶部融合圆角，hover/按钮边框不得越出可见背景。专用任务只进入对应 page，不能重复出现在总 Activity page。
+Island 是迷你控件。常驻 page 使用 200–500px 的统一可调总宽度（默认 350px），左右安全边距包含在该宽度内；所有 page 必须从扣除边距后的可用宽度动态排列控件，禁止 Media 等模块写死内部宽度。notification、small notification 与 Launcher 仍按自身内容独立改变 island 宽度。Activity、Timer、Removable、Device、Printing 等列表保持紧凑单行 `title | progress | value | actions`；Activity 行以约 25%/43%/最多 5%/剩余空间分配标题、进度条、可选百分比和圆形按钮。Media progress 必须保留 Git 历史中的语义尺寸：可拖动时 6px，不可拖动的兜底态 4px；不可拖动的 Activity/Timer/List progress 继承同一细条外观。Device 指标不能伪装成 Activity progress：存储设备显示容量占用条、磁盘图标与容量色；支持 BlueZ Battery 的设备显示电量条、电池图标，并按电量改变颜色。图标按钮默认约 22px、圆形、只在 hover 时显示提示；内容必须避开顶部融合圆角，hover/按钮边框不得越出可见背景。专用任务只进入对应 page，不能重复出现在总 Activity page。
 
 Activity 创建后延迟到 small notification 结束附近，在不改变 bar 几何的情况下短暂展示缩小版 Activity 进度；首次从 0 生长。Shift 固定 dot 后持续显示，后续上报从当前动画帧缓动到新值，不能每次重置到 0。running/warning 的暗色斜纹移动，paused 和终态保留静止斜纹。
 

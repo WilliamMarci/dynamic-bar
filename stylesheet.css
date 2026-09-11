@@ -258,6 +258,7 @@
 .dynamic-bar-live-percent {
     font-size: 8px;
 }
+.dynamic-bar-device-icon { color: rgba(255, 255, 255, 0.78); }
 
 .dynamic-bar-live-summary { font-size: 9px; color: rgba(255, 255, 255, 0.62); }
 .dynamic-bar-live-actions { spacing: 2px; }

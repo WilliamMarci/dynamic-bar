@@ -6,7 +6,7 @@ import St from 'gi://St';
 import {BarProvider, smallNotificationHeight, smallNotificationLabel}
     from '../provider.js';
 import {MprisService} from '../services/mprisService.js';
-import {createProgressBar, ISLAND_PROGRESS_WIDTH} from '../progressBar.js';
+import {createProgressBar} from '../progressBar.js';
 import {logError} from '../log.js';
 
 export class MediaProvider extends BarProvider {
@@ -47,7 +47,11 @@ export class MediaProvider extends BarProvider {
     }
 
     getLayoutOptions() {
-        return {paddingX: 24, paddingY: 14, minWidth: 372, minHeight: 116};
+        return {paddingX: 12, paddingY: 12, minHeight: 104};
+    }
+
+    _pageWidth() {
+        return this._settings.get_int('card-page-width');
     }
 
     getCards() {
@@ -216,7 +220,7 @@ export class MediaProvider extends BarProvider {
         return button;
     }
 
-    _createCover() {
+    _createCover(iconSize = 60) {
         const rawArtUrl = this._metadata['mpris:artUrl'];
         const artUrl = typeof rawArtUrl === 'string' ? rawArtUrl : '';
         if (!artUrl.startsWith('file://'))
@@ -225,7 +229,7 @@ export class MediaProvider extends BarProvider {
         try {
             return new St.Icon({
                 gicon: Gio.icon_new_for_string(artUrl),
-                icon_size: 60,
+                icon_size: iconSize,
                 style_class: 'dynamic-bar-media-cover',
             });
         } catch (error) {
@@ -265,14 +269,14 @@ export class MediaProvider extends BarProvider {
         return Clutter.EVENT_STOP;
     }
 
-    _createProgress() {
+    _createProgress(width) {
         const options = this.bar.presentation.options;
         const progress = createProgressBar({
             style_class: this._canSeek
                 ? 'dynamic-bar-media-progress dynamic-bar-media-progress-seekable'
                 : 'dynamic-bar-media-progress',
             reactive: this._canSeek,
-            width: ISLAND_PROGRESS_WIDTH,
+            width,
             height: this._canSeek ? 6 : 4,
             trackAlpha: options.trackAlpha,
             progressAlpha: options.progressAlpha,
@@ -350,16 +354,21 @@ export class MediaProvider extends BarProvider {
             style_class: 'dynamic-bar-media',
         });
 
+        const pageWidth = this._pageWidth();
+        const paddingX = this.getLayoutOptions().paddingX;
+        const coverSize = pageWidth < 280 ? 44 : 60;
         const top = new St.BoxLayout({style_class: 'dynamic-bar-media-top'});
-        const cover = this._createCover();
+        const cover = this._createCover(coverSize);
         if (cover)
             top.add_child(cover);
 
+        const infoWidth = Math.max(88, pageWidth - paddingX * 2 -
+            (cover ? coverSize + 12 : 0));
         const info = new St.BoxLayout({
             vertical: true,
             style_class: 'dynamic-bar-media-info',
             x_expand: true,
-            width: 270,
+            width: infoWidth,
         });
         const title = this._createMarquee(this._title(),
             'dynamic-bar-media-title');
@@ -407,7 +416,7 @@ export class MediaProvider extends BarProvider {
         info.add_child(title.viewport);
         info.add_child(subtitle.viewport);
         info.add_child(controls);
-        const progress = this._createProgress();
+        const progress = this._createProgress(infoWidth);
         info.add_child(progress);
         top.add_child(info);
         box.add_child(top);

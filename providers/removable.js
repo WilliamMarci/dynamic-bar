@@ -1,4 +1,5 @@
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import St from 'gi://St';
 
 import {BarProvider} from '../provider.js';
@@ -35,9 +36,11 @@ export class RemovableProvider extends BarProvider {
         const id = this._id(mount);
         this._mounts.set(id, mount);
         this._activities.registerInternal({id, title: mount.get_name(), source: 'gio-volume',
-            type: 'removable', group: 'removable', status: 'paused', silentStart: true,
+            type: 'removable', group: 'device', status: 'paused', silentStart: true,
             heartbeat: false, ring: this._mountedRing(),
-            progress: {kind: 'indeterminate'}, actions: [
+            progress: {kind: 'indeterminate'},
+            indicator: {kind: 'capacity', icon: 'drive-harddisk-usb-symbolic',
+                color: '#62a0ea'}, actions: [
                 {id: 'open', label: 'Open', icon: 'folder-open-symbolic'},
                 {id: 'eject', label: drive?.can_eject() ? 'Eject' : 'Unmount',
                     icon: 'media-eject-symbolic', dangerous: true},
@@ -46,6 +49,27 @@ export class RemovableProvider extends BarProvider {
             this._notify(`${mount.get_name()} connected`, 'Removable volume',
                 drive?.can_eject() ? 'drive-removable-media-symbolic'
                     : 'drive-harddisk-usb-symbolic');
+        this._updateCapacity(id, mount);
+    }
+
+    _updateCapacity(id, mount) {
+        const root = mount.get_root();
+        root.query_filesystem_info_async('filesystem::size,filesystem::free',
+            GLib.PRIORITY_DEFAULT, null, (file, result) => {
+                try {
+                    const info = file.query_filesystem_info_finish(result);
+                    const size = info.get_attribute_uint64('filesystem::size');
+                    const free = info.get_attribute_uint64('filesystem::free');
+                    if (size > 0) {
+                        this._activities.updateInternal(id, {
+                            progress: {kind: 'determinate', value: 1 - free / size},
+                            summary: `${Math.round(free / 1073741824)} GB free`,
+                        });
+                    }
+                } catch (error) {
+                    logError('Removable', error, `capacity ${id}`);
+                }
+            });
     }
 
     _remove(mount) {
