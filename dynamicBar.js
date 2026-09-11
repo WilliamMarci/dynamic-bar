@@ -93,6 +93,7 @@ export const DynamicBar = GObject.registerClass({
         this._activityCreateTimers = new Map();
         this._progress = 0;
         this._progressActive = false;
+        this._progressStyle = {};
         this._islandWidth = 0;
         this._islandHeight = 0;
         this._panelColorActor = null;
@@ -530,18 +531,22 @@ export const DynamicBar = GObject.registerClass({
             });
     }
 
-    setBarProgress(progress, active, animate = false) {
+    setBarProgress(progress, active, animate = false, style = {}) {
         if (this._destroyed || !this._bar)
             return;
         this._progress = progress;
         this._progressActive = active;
+        this._progressStyle = {
+            color: this._parseColor(style.color),
+            striped: Boolean(style.striped),
+        };
         if (this._activityPinnedId)
             return;
         this._syncBarPaint(animate);
     }
 
-    setProgress(progress, active = true, animate = false) {
-        this.setBarProgress(progress, active, animate);
+    setProgress(progress, active = true, animate = false, style = {}) {
+        this.setBarProgress(progress, active, animate, style);
     }
 
     setStatus(id, actor) {
@@ -561,6 +566,15 @@ export const DynamicBar = GObject.registerClass({
         }
     }
 
+    _activityBarStyle(state) {
+        const kind = ['timer', 'device'].includes(state.kind)
+            ? state.kind : 'activity';
+        return {
+            color: this._parseColor(this._settings.get_string(`bar-${kind}-color`)),
+            striped: this._settings.get_boolean(`bar-${kind}-striped`),
+        };
+    }
+
     setActivity(id, activity) {
         if (activity) {
             const isNew = !this._activities.has(id);
@@ -570,11 +584,10 @@ export const DynamicBar = GObject.registerClass({
                 const status = state.status ?? 'running';
                 const value = Number.isFinite(state.progress)
                     ? state.progress : 0.35;
-                this._bar.setPinnedActivityPreview(value, {
-                    color: this._parseColor(this._activityDotColor(status)),
-                    striped: true,
-                    animateStripes: status === 'running' || status === 'warning',
-                });
+                const style = this._activityBarStyle(state);
+                this._bar.setPinnedActivityPreview(value, {...style,
+                    animateStripes: style.striped &&
+                        (status === 'running' || status === 'warning')});
             } else if (isNew && state.status !== 'orphaned' &&
                 (!state.createdAt || Date.now() - state.createdAt < 5000)) {
                 const oldTimer = this._activityCreateTimers.get(id);
@@ -588,10 +601,10 @@ export const DynamicBar = GObject.registerClass({
                         const currentStatus = current.status ?? 'running';
                         const value = Number.isFinite(current.progress)
                             ? current.progress : 0.35;
-                        this.previewActivityProgress(value,
-                            this._activityDotColor(currentStatus),
-                            currentStatus === 'running' ||
-                                currentStatus === 'warning', 2800);
+                        const style = this._activityBarStyle(current);
+                        this.previewActivityProgress(value, style.color, style.striped,
+                            style.striped && (currentStatus === 'running' ||
+                                currentStatus === 'warning'), 2800);
                         return GLib.SOURCE_REMOVE;
                     });
                 this._activityCreateTimers.set(id, timerId);
@@ -758,8 +771,10 @@ export const DynamicBar = GObject.registerClass({
                             hoverRing.visible = true;
                             const preview = Number.isFinite(state.progress)
                                 ? state.progress : 0.35;
-                            this.previewActivityProgress(preview, color,
-                                status === 'running' || status === 'warning');
+                            const style = this._activityBarStyle(state);
+                            this.previewActivityProgress(preview, style.color,
+                                style.striped, style.striped &&
+                                (status === 'running' || status === 'warning'));
                             visual.ease({
                                 scale_x: options.activityDotHoverScale,
                                 scale_y: options.activityDotHoverScale,
@@ -797,8 +812,10 @@ export const DynamicBar = GObject.registerClass({
                 // Timer card changes only paint, never bar geometry.
                 const preview = Number.isFinite(state.progress)
                     ? state.progress : 0.35;
-                this.previewActivityProgress(preview, color,
-                    status === 'running' || status === 'warning');
+                const style = this._activityBarStyle(state);
+                this.previewActivityProgress(preview, style.color, style.striped,
+                    style.striped && (status === 'running' ||
+                        status === 'warning'));
                 return Clutter.EVENT_STOP;
             });
             this._activityBox.add_child(holder);
@@ -814,26 +831,23 @@ export const DynamicBar = GObject.registerClass({
         } else {
             this._activityPinnedId = id;
             const value = Number.isFinite(state.progress) ? state.progress : 0.35;
-            this._bar.setPinnedActivityPreview(value, {
-                color: this._parseColor(this._activityDotColor(
-                    state.status ?? 'running')),
-                striped: true,
-                animateStripes: state.status === 'running' ||
-                    state.status === 'warning',
-            });
+            const style = this._activityBarStyle(state);
+            this._bar.setPinnedActivityPreview(value, {...style,
+                animateStripes: style.striped && (state.status === 'running' ||
+                    state.status === 'warning')});
         }
         this._rebuildDots();
     }
 
-    previewActivityProgress(progress, color = null, animateStripes = true,
-        duration = 1800) {
+    previewActivityProgress(progress, color = null, striped = true,
+        animateStripes = striped, duration = 1800) {
         if (this._activityPinnedId)
             return;
         if (this._activityPreviewTimerId)
             GLib.source_remove(this._activityPreviewTimerId);
         this._bar.setActivityPreview(progress, {
-            color: this._parseColor(color),
-            striped: true,
+            color: Array.isArray(color) ? color : this._parseColor(color),
+            striped,
             animateStripes,
         });
         // Keep previewing while the pointer lingers on the activity dots.
@@ -872,7 +886,7 @@ export const DynamicBar = GObject.registerClass({
             return;
         if (this._expanded && !this._passiveExpanded)
             return;
-        this._bar.setProgress(1, true);
+        this._bar.setProgress(1, true, false, this._progressStyle);
         this._bar.easeProgress(0, 180);
     }
 
@@ -1306,7 +1320,7 @@ export const DynamicBar = GObject.registerClass({
         // that state is animated by BarBackground.
         const active = this._progressActive &&
             (!this._expanded || this._passiveExpanded);
-        this._bar.setProgress(this._progress, active, animate);
+        this._bar.setProgress(this._progress, active, animate, this._progressStyle);
     }
 
     _setIslandContent(provider) {

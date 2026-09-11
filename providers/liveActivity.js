@@ -1,6 +1,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
+import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {BarProvider, smallNotificationHeight, smallNotificationLabel}
@@ -135,7 +136,7 @@ export class LiveActivityProvider extends BarProvider {
             timer.sourceId = 0; this._timers.delete(id);
             this.finishInternal(id, {status: 'cancelled', summary: 'Timer ended'}); };
         this.registerInternal({id, title: title || 'Timer', source: 'dynamic-bar', type: 'timer',
-            group: 'timer', heartbeat: false,
+            group: 'timer', heartbeat: false, silentStart: true,
             progress: {kind: 'determinate', value: 0},
             actions: [{id: 'pause', label: 'Pause'}, {id: 'resume', label: 'Resume'},
                 {id: 'skip', label: 'Skip'}, {id: 'end', label: 'End', dangerous: true}]},
@@ -146,6 +147,7 @@ export class LiveActivityProvider extends BarProvider {
         startSource();
         this._timers.set(id, timer);
         update();
+        this._notifyTimerStarted(title || 'Timer', seconds);
     }
 
     Start(id, title, command, terminalPid) {
@@ -253,6 +255,8 @@ export class LiveActivityProvider extends BarProvider {
             const progress = task.progress?.kind === 'determinate'
                 ? Number(task.progress.value) : NaN;
             this.bar.activity(group, {status: task.status, progress,
+                kind: task.group === 'timer' ? 'timer'
+                    : task.group === 'device' ? 'device' : 'activity',
                 ring: task.ring, createdAt: task.createdAt,
                 onClick: () => this._focusGroup(group)});
         }
@@ -349,6 +353,21 @@ export class LiveActivityProvider extends BarProvider {
                 ? `${task.title} completed` : `${task.title} ${task.status}`,
             style_class: 'dynamic-bar-notice-title'})); return box;}, destroyIslandActor() {}},
         {timeout: 2800, passive: true, paddingX: 16, paddingY: 10});
+    }
+
+    _notifyTimerStarted(title, seconds) {
+        this.bar.notification({createIslandActor: () => {
+            const box = new St.BoxLayout({style_class: 'dynamic-bar-notice'});
+            box.add_child(new St.Icon({icon_name: 'alarm-symbolic', icon_size: 22}));
+            const labels = new St.BoxLayout({vertical: true});
+            labels.add_child(new St.Label({text: title,
+                style_class: 'dynamic-bar-notice-title'}));
+            labels.add_child(new St.Label({text: `Timer started · ${seconds}s`,
+                style_class: 'dynamic-bar-notice-label'}));
+            box.add_child(labels);
+            return box;
+        }, destroyIslandActor() {}}, {timeout: 2600, passive: true,
+            paddingX: 16, paddingY: 10});
     }
 
     _requestAction(task, actionId) {
@@ -475,12 +494,12 @@ export class LiveActivityProvider extends BarProvider {
         return {fraction: 0, indeterminate: true, label: '…'};
     }
 
-    _createProgress(task) {
+    _createProgress(task, width) {
         const options = this.bar.presentation.options;
         const model = this._progressModel(task);
         const actor = createProgressBar({
-            width: Math.round((this._settings.get_int('card-page-width') - 20) * 0.43),
-            height: 4,
+            width,
+            height: this._settings.get_int('list-progress-height'),
             style_class: 'dynamic-bar-progress',
             trackAlpha: options.trackAlpha,
             progressAlpha: options.progressAlpha,
@@ -595,6 +614,21 @@ export class LiveActivityProvider extends BarProvider {
             track_hover: true,
         });
 
+        const actions = this._visibleActions(task);
+        const buttonCount = actions.length + (task.logPath ? 1 : 0) + 1;
+        const contentWidth = this._settings.get_int('card-page-width') - 20;
+        const indicatorWidth = task.indicator?.icon ? 18 : 0;
+        const percentWidth = Math.max(14, Math.round(contentWidth * 0.05));
+        const controlsWidth = buttonCount * 22 + Math.max(0, buttonCount - 1) * 2;
+        const gapsWidth = 15 + (indicatorWidth ? 5 : 0);
+        const flexible = Math.max(48, contentWidth - indicatorWidth - percentWidth -
+            controlsWidth - gapsWidth);
+        const desiredTitle = contentWidth * 0.25;
+        const desiredProgress = contentWidth * 0.43;
+        const scale = Math.min(1, flexible / (desiredTitle + desiredProgress));
+        const titleWidth = Math.max(28, Math.round(desiredTitle * scale));
+        const progressWidth = Math.max(20, Math.round(flexible - titleWidth));
+
         const title = new St.Label({
             text: task.title,
             style_class: 'dynamic-bar-live-title',
@@ -602,8 +636,8 @@ export class LiveActivityProvider extends BarProvider {
             x_align: Clutter.ActorAlign.START,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        const contentWidth = this._settings.get_int('card-page-width') - 20;
-        title.set_width(Math.round(contentWidth * 0.25));
+        title.set_width(titleWidth);
+        title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         if (task.summary)
             title.accessible_name = task.summary;
         row.add_child(title);
@@ -613,7 +647,7 @@ export class LiveActivityProvider extends BarProvider {
                 icon_size: 13, style_class: 'dynamic-bar-device-icon',
                 y_align: Clutter.ActorAlign.CENTER}));
         }
-        const {actor: progress, label} = this._createProgress(task);
+        const {actor: progress, label} = this._createProgress(task, progressWidth);
         row.add_child(progress);
         const percent = new St.Label({
             text: label,
@@ -621,14 +655,16 @@ export class LiveActivityProvider extends BarProvider {
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        percent.set_width(Math.round(contentWidth * 0.05));
+        percent.set_width(percentWidth);
         row.add_child(percent);
 
         const controls = new St.BoxLayout({
             style_class: 'dynamic-bar-live-actions',
+            x_expand: true,
+            x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,
         });
-        for (const action of this._visibleActions(task))
+        for (const action of actions)
             controls.add_child(this._actionButton(task, action));
         if (task.logPath) {
             const openLog = createIconButton({

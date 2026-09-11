@@ -26,8 +26,8 @@ export class BarProvider {
     }
 
     /** Publish persistent progress in the dynamic bar. */
-    setProgress(value, active = true, animate = false) {
-        this._api.progress(value, active, animate);
+    setProgress(value, active = true, animate = false, style = {}) {
+        this._api.progress(value, active, animate, style);
     }
 
     /** Publish or clear persistent status content in an icon zone. */

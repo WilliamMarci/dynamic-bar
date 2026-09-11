@@ -162,6 +162,43 @@
       <summary>Completed activity expiry</summary>
       <description>Seconds before a completed activity is automatically removed.</description>
     </key>
+    <key name="list-progress-height" type="i">
+      <default>3</default><range min="1" max="10"/>
+      <summary>List progress height</summary>
+      <description>Logical-pixel progress thickness for activity, timer and device rows.</description>
+    </key>
+    <key name="bar-media-color" type="s">
+      <default>'#ffffff'</default><summary>Media bar color</summary>
+      <description>Dynamic bar media progress color.</description>
+    </key>
+    <key name="bar-media-striped" type="b">
+      <default>false</default><summary>Striped media bar</summary>
+      <description>Draw media progress with stripes.</description>
+    </key>
+    <key name="bar-activity-color" type="s">
+      <default>'#ff9f0a'</default><summary>Activity bar color</summary>
+      <description>Dynamic bar generic activity color.</description>
+    </key>
+    <key name="bar-activity-striped" type="b">
+      <default>true</default><summary>Striped activity bar</summary>
+      <description>Draw generic activities with stripes.</description>
+    </key>
+    <key name="bar-timer-color" type="s">
+      <default>'#ff9f0a'</default><summary>Timer bar color</summary>
+      <description>Dynamic bar timer color.</description>
+    </key>
+    <key name="bar-timer-striped" type="b">
+      <default>true</default><summary>Striped timer bar</summary>
+      <description>Draw timers with stripes.</description>
+    </key>
+    <key name="bar-device-color" type="s">
+      <default>'#62a0ea'</default><summary>Device bar color</summary>
+      <description>Dynamic bar device color.</description>
+    </key>
+    <key name="bar-device-striped" type="b">
+      <default>false</default><summary>Striped device bar</summary>
+      <description>Draw device metrics with stripes.</description>
+    </key>
     <key name="activity-running-color" type="s">
       <default>'#ff9f0a'</default>
       <summary>Running activity color</summary>

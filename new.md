@@ -172,3 +172,4 @@
 - [ ] 鼠标位于 island 背景、任意卡片内容、按钮或控制条时不会触发自动收回。
 - [ ] `journalctl --user -o cat /usr/bin/gnome-shell | grep '\[Dynamic Bar\]'` 能看到带模块与上下文的错误，而不是静默失败。
 - [ ] 新 Activity 在开始后的前几秒让 dynamic bar 显示缩小版主题色/斜纹进度；Shift 固定 dot 后持续显示，连续更新不回零、不跳帧，暂停时仅冻结斜纹。
+- [ ] Timer started 显示普通两行 notification；列表 progress 厚度可在 Fine Tune 调整；Media/Activity/Timer/Device 的 dynamic bar 颜色和斜纹可分别设置。

@@ -181,11 +181,15 @@ class BarBackground extends St.DrawingArea {
         this.queue_repaint();
     }
 
-    setProgress(progress, active, animate = false) {
+    setProgress(progress, active, animate = false, style = {}) {
         const target = Math.min(Math.max(progress, 0), 1);
-        this._activityStriped = false;
+        this._activityColor = style.color ?? null;
+        this._activityStriped = style.striped ?? false;
+        this._activityStripeAnimated = this._activityStriped;
         this._activityPreviewPinned = false;
         this._stopStripeTick();
+        if (this._activityStriped)
+            this._stripedTick();
         if (this._glowActive) {
             this._targetProgress = target;
             this._active = active;
@@ -194,7 +198,6 @@ class BarBackground extends St.DrawingArea {
         // Grow the fill from zero when progress becomes visible again (for
         // example when the island collapses back to the bar).
         if (active && !this._active) {
-            this._activityColor = null;
             this._progress = 0;
             this._fromProgress = 0;
             this._targetProgress = target;
@@ -208,7 +211,6 @@ class BarBackground extends St.DrawingArea {
             return;
         }
         if (animate && active && Math.abs(target - this._progress) > 0.002) {
-            this._activityColor = null;
             this._fromProgress = this._progress;
             this._targetProgress = target;
             this._elapsed = 0;
@@ -221,7 +223,6 @@ class BarBackground extends St.DrawingArea {
             return;
         }
         this._stopTick();
-        this._activityColor = null;
         this._progress = target;
         this._targetProgress = target;
         this._active = active;

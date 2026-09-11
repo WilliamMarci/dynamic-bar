@@ -540,6 +540,15 @@ export default class DynamicBarPreferences extends ExtensionPreferences {
             'Automatically remove completed activities');
         addSpinRow(activityGroup, settings, 'activity-expiry-seconds',
             'Remove completed after (seconds)', {min: 1, max: 86400, step: 1});
+        addSpinRow(activityGroup, settings, 'list-progress-height',
+            'List progress thickness (logical px)', {min: 1, max: 10, step: 1});
+        for (const [kind, title] of [['media', 'Media'], ['activity', 'Activity'],
+            ['timer', 'Timer'], ['device', 'Device']]) {
+            addColorRow(activityGroup, settings, `bar-${kind}-color`,
+                `${title} dynamic bar color`);
+            addSwitchRow(activityGroup, settings, `bar-${kind}-striped`,
+                `${title} dynamic bar stripes`);
+        }
         addColorRow(activityGroup, settings, 'activity-running-color', 'Running color');
         addColorRow(activityGroup, settings, 'activity-success-color', 'Completed color');
         addColorRow(activityGroup, settings, 'activity-paused-color', 'Paused color');

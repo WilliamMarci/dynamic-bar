@@ -10,8 +10,8 @@ export class DynamicBarApi {
         this._controller = controller;
     }
 
-    progress(value, active = true, animate = false) {
-        this._controller.setProgress(value, active, animate);
+    progress(value, active = true, animate = false, style = {}) {
+        this._controller.setProgress(value, active, animate, style);
     }
 
     status(id, actor) {

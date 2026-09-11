@@ -65,6 +65,7 @@ export class IslandCardDeck {
         this._attachedHolder = null;
         this._strip = null;
         this._cardActor = null;
+        this._cardFrame = null;
         this._attachedActor = null;
         this._navigation = null;
         this._toggle = null;
@@ -259,12 +260,13 @@ export class IslandCardDeck {
             });
             const paddingX = this._cards[index].layout?.paddingX ?? 0;
             cardActor.set_width(Math.max(1, this._pageWidth() - paddingX * 2));
-            if (paddingX > 0) {
-                this._cardActor.set_style(
-                    `margin-left: ${paddingX}px; margin-right: ${paddingX}px;`);
-            }
             this._cardActor.x_align = Clutter.ActorAlign.CENTER;
-            this._cardHolder.add_child(this._cardActor);
+            this._cardFrame = new St.Widget({
+                layout_manager: new Clutter.BinLayout(),
+                width: this._pageWidth(),
+            });
+            this._cardFrame.add_child(this._cardActor);
+            this._cardHolder.add_child(this._cardFrame);
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 if (this._cardActor !== cardActor)
                     return GLib.SOURCE_REMOVE;
@@ -279,10 +281,11 @@ export class IslandCardDeck {
     }
 
     _destroyCard() {
-        if (this._cardActor) {
-            const actor = this._cardActor;
+        if (this._cardFrame) {
+            const frame = this._cardFrame;
             this._cardActor = null;
-            actor.destroy();
+            this._cardFrame = null;
+            frame?.destroy();
         }
         if (this._displayedIndex !== undefined) {
             this._cards[this._displayedIndex]?.onDestroy?.();

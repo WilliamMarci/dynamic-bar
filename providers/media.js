@@ -116,7 +116,10 @@ export class MediaProvider extends BarProvider {
 
     _updateBar(animate = false) {
         const active = this._playing || this._length > 0;
-        this.setProgress(this._length > 0 ? this._progress : 0, active, animate);
+        this.setProgress(this._length > 0 ? this._progress : 0, active, animate, {
+            color: this._settings.get_string('bar-media-color'),
+            striped: this._settings.get_boolean('bar-media-striped'),
+        });
     }
 
     _title() {
