@@ -536,6 +536,10 @@ export default class DynamicBarPreferences extends ExtensionPreferences {
         addSpinRow(activityGroup, settings, 'activity-dot-hit-size', 'Near-hover hit area (px)', {min: 4, max: 40, step: 1});
         addSpinRow(activityGroup, settings, 'activity-dot-hover-scale', 'Hover scale', {min: 1, max: 3, step: 0.1});
         addSpinRow(activityGroup, settings, 'activity-dot-border-width', 'Completed border (px)', {min: 0, max: 4, step: 1});
+        addSwitchRow(activityGroup, settings, 'activity-auto-remove',
+            'Automatically remove completed activities');
+        addSpinRow(activityGroup, settings, 'activity-expiry-seconds',
+            'Remove completed after (seconds)', {min: 1, max: 86400, step: 1});
         addColorRow(activityGroup, settings, 'activity-running-color', 'Running color');
         addColorRow(activityGroup, settings, 'activity-success-color', 'Completed color');
         addColorRow(activityGroup, settings, 'activity-paused-color', 'Paused color');

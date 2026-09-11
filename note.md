@@ -172,4 +172,6 @@ Island 是迷你控件。常驻 page 使用 200–500px 的统一可调总宽度
 
 Activity 创建后延迟到 small notification 结束附近，在不改变 bar 几何的情况下短暂展示缩小版 Activity 进度；首次从 0 生长。Shift 固定 dot 后持续显示，后续上报从当前动画帧缓动到新值，不能每次重置到 0。running/warning 的暗色斜纹移动，paused 和终态保留静止斜纹。
 
+Activity 完成后的生命周期由 `Automatically remove completed activities` 和过期秒数统一控制；关闭自动移除时终态保留到用户 Stop tracking。显式由兼容 API 提供的 `expiresAt` 优先于全局默认。Island 已经展开时切歌只更新 Media page，不再发送重复的 small notification。固定 Activity 后它独占 dynamic bar 绘制层：Media 可以继续缓存播放进度，但 position 刷新、切歌 reset 和 activation 动画均不得覆盖固定进度；取消固定或固定任务消失后恢复最新 Media progress。
+
 Stop tracking 必须能删除最后一项；最后一项消失后对应 page 立即从 deck 移除，若没有其他卡片则回退到 Launcher。Island 自动收回必须同时检查背景、内容 holder 和 bar 的 hover，鼠标位于任何 island 内容上时不得收回。可恢复错误统一用 `[Dynamic Bar][模块]` 结构写入 GNOME Shell journal，并携带对象 ID 或配置项上下文，禁止吞掉解析、图标、卡片创建和设备操作异常。

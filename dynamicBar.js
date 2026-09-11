@@ -535,6 +535,8 @@ export const DynamicBar = GObject.registerClass({
             return;
         this._progress = progress;
         this._progressActive = active;
+        if (this._activityPinnedId)
+            return;
         this._syncBarPaint(animate);
     }
 
@@ -601,6 +603,7 @@ export const DynamicBar = GObject.registerClass({
             if (this._activityPinnedId === id) {
                 this._activityPinnedId = null;
                 this._bar.clearActivityPreview();
+                this._syncBarPaint();
             }
             this._activities.delete(id);
         }
@@ -824,6 +827,8 @@ export const DynamicBar = GObject.registerClass({
 
     previewActivityProgress(progress, color = null, animateStripes = true,
         duration = 1800) {
+        if (this._activityPinnedId)
+            return;
         if (this._activityPreviewTimerId)
             GLib.source_remove(this._activityPreviewTimerId);
         this._bar.setActivityPreview(progress, {
@@ -852,6 +857,8 @@ export const DynamicBar = GObject.registerClass({
     }
 
     playMediaActivation(progress) {
+        if (this._activityPinnedId)
+            return;
         this._bar.playActivation(progress, 480);
     }
 
@@ -861,6 +868,8 @@ export const DynamicBar = GObject.registerClass({
     }
 
     flashTrackChange() {
+        if (this._activityPinnedId)
+            return;
         if (this._expanded && !this._passiveExpanded)
             return;
         this._bar.setProgress(1, true);
@@ -1289,6 +1298,8 @@ export const DynamicBar = GObject.registerClass({
 
     _syncBarPaint(animate = false) {
         if (!this._bar)
+            return;
+        if (this._activityPinnedId)
             return;
         // Expanded islands show the plain long bar; progress is only painted
         // in the collapsed (or passively expanded) state. The transition into

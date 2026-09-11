@@ -207,7 +207,9 @@ export class LiveActivityProvider extends BarProvider {
         if (result.progress) task.progress = result.progress;
         else if (task.status === 'success') task.progress = {kind: 'determinate', value: 1};
         task.updatedAt = now();
-        task.expiresAt ||= task.updatedAt + (task.status === 'success' ? 30000 : 300000);
+        if (!task.expiresAt && this._settings.get_boolean('activity-auto-remove'))
+            task.expiresAt = task.updatedAt +
+                this._settings.get_int('activity-expiry-seconds') * 1000;
         this._sync(task);
         this._notifyComplete(task);
     }

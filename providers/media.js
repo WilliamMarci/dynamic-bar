@@ -97,7 +97,8 @@ export class MediaProvider extends BarProvider {
         if (wasAvailable !== this.isAvailable)
             this.bar.cardsChanged();
         if (previousTrack && this._trackId !== previousTrack) {
-            this._showTrackNotification();
+            if (!this.bar.presentation.expanded)
+                this._showTrackNotification();
             this.bar.flashProgressReset();
         } else {
             this._updateBar(true);
