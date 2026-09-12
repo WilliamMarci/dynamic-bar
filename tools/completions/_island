@@ -1,0 +1,35 @@
+#compdef island
+
+_island() {
+  local context state state_descr line
+  typeset -A opt_args
+  _arguments -C \
+    '1:command:->command' \
+    '*::argument:->args'
+
+  case $state in
+    command)
+      _values 'command or executable' \
+        'run[run a command]' 'timer[start a timer]' 'help[show help]' \
+        'list[list adapters and extensions]' 'inspect[inspect activities]' \
+        'demo[run a demo]' 'start[start an activity]' 'update[update progress]' \
+        'done[finish successfully]' 'fail[finish with error]' 'dismiss[dismiss activity]'
+      _command_names
+      ;;
+    args)
+      case $line[1] in
+        timer)
+          _arguments '1:duration:(10s 30s 1m 5m 25m 1h)' \
+            '(-t --title)'{-t,--title}'[set title]:title:'
+          ;;
+        demo) _values 'mode' progress ;;
+        run)
+          _arguments '(-t --title)'{-t,--title}'[set title]:title:' '*::command:_normal'
+          ;;
+        *) _normal ;;
+      esac
+      ;;
+  esac
+}
+
+_island "$@"

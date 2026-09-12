@@ -16,7 +16,7 @@ ln -s ~/.local/share/gnome-shell/extensions/dynamic-bar@william-marci/tools/isla
 Examples:
 
 ```sh
-island --title "Building app" npm run build
+island -t "Building app" npm run build
 island cmake --build build
 island --title "System upgrade" sudo apt upgrade
 island list
@@ -25,6 +25,16 @@ island timer 25m --title "Focus"
 island inspect
 island demo
 ```
+
+`-t` is the short form of `--title` and works with both `run` and `timer`.
+
+Install Bash, Zsh and Fish tab-completion definitions for the current user:
+
+```sh
+make -C ~/.local/share/gnome-shell/extensions/dynamic-bar@william-marci/tools install-completions
+```
+
+Open a new terminal afterwards (or reload the shell's completion system).
 
 `run` is optional, so `island npm run build` and `island run npm run build`
 are equivalent. Use the explicit form to execute a command literally named

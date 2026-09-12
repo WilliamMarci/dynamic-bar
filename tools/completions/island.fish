@@ -1,0 +1,10 @@
+complete -c island -f
+complete -c island -n '__fish_use_subcommand' -a 'run' -d 'Run a command'
+complete -c island -n '__fish_use_subcommand' -a 'timer' -d 'Start a timer'
+complete -c island -n '__fish_use_subcommand' -a 'help list inspect demo start update done fail dismiss'
+complete -c island -n '__fish_use_subcommand' -a '(__fish_complete_command)'
+complete -c island -s h -l help -d 'Show help'
+complete -c island -s t -l title -r -d 'Set activity title'
+complete -c island -n '__fish_seen_subcommand_from timer' -a '10s 30s 1m 5m 25m 1h'
+complete -c island -n '__fish_seen_subcommand_from demo' -a 'progress'
+complete -c island -n '__fish_seen_subcommand_from run' -a '(__fish_complete_command)'

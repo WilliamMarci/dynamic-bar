@@ -72,13 +72,13 @@ static std::string displayCommand(const std::vector<std::string>& args) {
 
 static void printHelp(std::ostream& out) {
     out << "Usage:\n"
-        << "  island [run] [--title TITLE] [--] COMMAND [ARGS...]\n"
+        << "  island [run] [-t|--title TITLE] [--] COMMAND [ARGS...]\n"
         << "  island help\n"
         << "  island list\n"
         << "  island inspect | demo [progress]\n"
         << "  island start ID [TITLE] | update ID PERCENT | done ID [SUMMARY]\n"
         << "  island fail ID [SUMMARY] | dismiss ID\n"
-        << "  island timer DURATION[s|m|h] [--title TITLE]\n\n"
+        << "  island timer DURATION[s|m|h] [-t|--title TITLE]\n\n"
         << "The run subcommand is optional. Use 'island run' when a command is "
         << "literally named help or list.\n";
 }
@@ -135,13 +135,14 @@ static unsigned parseDuration(const std::string& text) {
 
 static int createTimer(int argc, char** argv) {
     if (argc < 3) {
-        std::cerr << "Usage: island timer DURATION[s|m|h] [--title TITLE]\n";
+        std::cerr << "Usage: island timer DURATION[s|m|h] [-t|--title TITLE]\n";
         return 2;
     }
     const unsigned seconds = parseDuration(argv[2]);
     if (!seconds) return 2;
     std::string title = "Timer";
-    if (argc >= 5 && std::string(argv[3]) == "--title") title = argv[4];
+    if (argc >= 5 && (std::string(argv[3]) == "--title" ||
+        std::string(argv[3]) == "-t")) title = argv[4];
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     const std::string id = std::to_string(getpid()) + "-timer-" + std::to_string(stamp);
     GError* error = nullptr;
@@ -466,7 +467,8 @@ int main(int argc, char** argv) {
         printHelp(std::cerr);
         return 2;
     }
-    if (index + 1 < argc && std::string(argv[index]) == "--title") {
+    if (index + 1 < argc && (std::string(argv[index]) == "--title" ||
+        std::string(argv[index]) == "-t")) {
         title = argv[index + 1];
         index += 2;
     }

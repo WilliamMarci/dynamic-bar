@@ -114,7 +114,7 @@ Launcher 使用结构化项目配置。设置页可逐项增加、删除，并�
 
 ## Live Activity
 
-扩展库内提供无 Python 依赖的 C++ 命令包装器 `tools/island`。用户把它软链接到 `~/.local/bin/island` 后，可使用 `island [run] [--title TITLE] COMMAND [ARGS...]`；`run` 默认且可省略，title 可选，省略时使用完整命令文本。`island help` 显示语法，`island list` 从适配器注册表列出当前安装的兼容支持；裸 `island` 因没有待执行命令而显示 help。若扩展/D-Bus 暂时不可用，原命令仍必须执行，只跳过 Live Activity 上报。包装器必须直接执行参数而不是再次交给 shell 解析，透传输出和退出码，并通过 session D-Bus 向扩展发送 Start、Update、Complete。
+扩展库内提供无 Python 依赖的 C++ 命令包装器 `tools/island`。用户把它软链接到 `~/.local/bin/island` 后，可使用 `island [run] [-t|--title TITLE] COMMAND [ARGS...]`；`run` 默认且可省略，title 可选，省略时使用完整命令文本。`-t` 与 `--title` 完全等价，也适用于 timer。工具随附 Bash、Zsh、Fish 的 Tab 补全定义，覆盖子命令、选项、duration 示例和被包装命令。`island help` 显示语法，`island list` 从适配器注册表列出当前安装的兼容支持；裸 `island` 因没有待执行命令而显示 help。若扩展/D-Bus 暂时不可用，原命令仍必须执行，只跳过 Live Activity 上报。包装器必须直接执行参数而不是再次交给 shell 解析，透传输出和退出码，并通过 session D-Bus 向扩展发送 Start、Update、Complete。
 
 命令输出进度解析属于独立兼容层 `tools/progressAdapters.hpp`。适配器通过稳定的具名注册 API 提供 id、匹配命令、说明与解析规则，`island list` 直接读取同一注册表。首版提供 CMake/Make/Ninja、APT/DPKG 和通用百分比适配；未来 SCP 等兼容只注册新 Adapter，不修改命令执行、输出转发、D-Bus 或 UI 层。无法识别时显示不确定进度，不能因此阻止 activity、完成状态或原命令执行。
 
