@@ -552,6 +552,7 @@ export default class DynamicBarPreferences extends ExtensionPreferences {
                 `${title} dynamic bar stripes`);
         }
         addColorRow(activityGroup, settings, 'activity-running-color', 'Running color');
+        addColorRow(activityGroup, settings, 'timer-dot-color', 'Timer dot color');
         addColorRow(activityGroup, settings, 'activity-success-color', 'Completed color');
         addColorRow(activityGroup, settings, 'activity-paused-color', 'Paused color');
         addColorRow(activityGroup, settings, 'activity-warning-color', 'Warning/orphaned color');

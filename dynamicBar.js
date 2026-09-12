@@ -40,6 +40,7 @@ export const DEFAULTS = {
     activityDotHoverScale: 1.6,
     activityDotBorderWidth: 1,
     activityRunningColor: '#ff9f0a',
+    timerDotColor: '#3584e4',
     activitySuccessColor: '#33d17a',
     activityPausedColor: '#77767b',
     activityWarningColor: '#f6d32d',
@@ -559,8 +560,9 @@ export const DynamicBar = GObject.registerClass({
         this.setRightIndicator(id, actor);
     }
 
-    _activityDotColor(status) {
+    _activityDotColor(state) {
         const options = this._options;
+        const status = state.status ?? (state.completed ? 'success' : 'running');
         switch (status) {
         case 'success': return options.activitySuccessColor;
         case 'paused': return options.activityPausedColor;
@@ -568,7 +570,8 @@ export const DynamicBar = GObject.registerClass({
         case 'orphaned': return options.activityWarningColor;
         case 'error':
         case 'cancelled': return options.activityErrorColor;
-        default: return options.activityRunningColor;
+        default: return state.kind === 'timer'
+            ? options.timerDotColor : options.activityRunningColor;
         }
     }
 
@@ -700,7 +703,7 @@ export const DynamicBar = GObject.registerClass({
 
         for (const [activityId, state] of this._activities) {
             const status = state.status ?? (state.completed ? 'success' : 'running');
-            const color = this._activityDotColor(status);
+            const color = this._activityDotColor(state);
 
             const holder = new St.Widget({
                 layout_manager: new Clutter.BinLayout(),
@@ -1324,6 +1327,8 @@ export const DynamicBar = GObject.registerClass({
                 DEFAULTS.activityDotBorderWidth),
             activityRunningColor: settings?.get_string('activity-running-color') ??
                 DEFAULTS.activityRunningColor,
+            timerDotColor: settings?.get_string('timer-dot-color') ??
+                DEFAULTS.timerDotColor,
             activitySuccessColor: settings?.get_string('activity-success-color') ??
                 DEFAULTS.activitySuccessColor,
             activityPausedColor: settings?.get_string('activity-paused-color') ??

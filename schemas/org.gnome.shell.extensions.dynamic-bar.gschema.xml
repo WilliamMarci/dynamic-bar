@@ -209,6 +209,11 @@
       <summary>Running activity color</summary>
       <description>Color of running activity dots and progress fills.</description>
     </key>
+    <key name="timer-dot-color" type="s">
+      <default>'#3584e4'</default>
+      <summary>Timer activity dot color</summary>
+      <description>Color of running timer dots, independently of generic activities.</description>
+    </key>
     <key name="activity-success-color" type="s">
       <default>'#33d17a'</default>
       <summary>Success activity color</summary>

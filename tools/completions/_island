@@ -14,10 +14,18 @@ _island() {
         'list[list adapters and extensions]' 'inspect[inspect activities]' \
         'demo[run a demo]' 'start[start an activity]' 'update[update progress]' \
         'done[finish successfully]' 'fail[finish with error]' 'dismiss[dismiss activity]'
+      _values 'extension option' '-e[run extension]' '--extension[run extension]'
       _command_names
       ;;
     args)
       case $line[1] in
+        -e|--extension)
+          if (( CURRENT == 3 )); then
+            _values 'extension' 'file[copy, move or remove files with progress]'
+          elif [[ $line[2] == file ]]; then
+            _alternative 'actions:action:(help copy move remove)' 'files:file:_files'
+          fi
+          ;;
         timer)
           _arguments '1:duration:(10s 30s 1m 5m 25m 1h)' \
             '(-t --title)'{-t,--title}'[set title]:title:'

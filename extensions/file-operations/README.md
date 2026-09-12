@@ -1,10 +1,14 @@
 # File operations extension
 
-Build with `make`, then optionally link `island-file` into `~/.local/bin`.
+Build with `make`. The executable is an internal extension entry and is
+dispatched through the common `island` command; it should not be linked into
+`PATH` separately.
 
 ```sh
-island-file copy SOURCE DESTINATION
-island-file move SOURCE DESTINATION
+island -e file copy SOURCE DESTINATION
+island -e file move SOURCE DESTINATION
+island -e file remove PATH
+island -e file help
 ```
 
 Files are copied in chunks and directories recursively. Progress is calculated

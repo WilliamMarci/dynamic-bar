@@ -166,6 +166,8 @@ Dynamic bar 与 island 内的 progress bar 是两个内部差异很大的独立�
 
 Activity dot 的 hover 与点击属于统一的进度预览入口：hover 延迟触发后，底部 dynamic bar 从 0 生长到该 Activity 当前进度，并在指针仍停留于圆点区时保持；Activity 已完成部分使用主题色填充并覆盖主题色对应的暗色动态斜纹。running 时斜纹移动，paused 时保留在当前位置但停止移动。Shift+点击仍用于持久固定，普通点击用于打开并聚焦对应卡片。
 
+Timer 的 running activity dot 使用独立的 `timer-dot-color` Fine Tune 设置，不继承通用 Activity running 色；paused、success、warning 和 error 仍使用统一状态色，保证状态语义一致。
+
 通过 Activity dot 切换到 Timer 卡片时，必须在卡片展开完成后再应用 Activity bar 绘制，避免展开流程把它覆盖成普通白条。这里只切换主题色进度与动态斜纹，不改变 dynamic bar 当时的宽度、高度和水平位置。
 
 Island 是迷你控件。常驻 page 使用 200–500px 的统一可调总宽度（默认 350px），左右安全边距包含在该宽度内；所有 page 必须从扣除边距后的可用宽度动态排列控件，禁止 Media 等模块写死内部宽度。notification、small notification 与 Launcher 仍按自身内容独立改变 island 宽度。Activity、Timer、Removable、Device、Printing 等列表保持紧凑单行 `title | progress | value | actions`；Activity 行以约 25%/43%/最多 5%/剩余空间分配标题、进度条、可选百分比和圆形按钮。Media progress 必须保留 Git 历史中的语义尺寸：可拖动时 6px，不可拖动的兜底态 4px；不可拖动的 Activity/Timer/List progress 继承同一细条外观。Device 指标不能伪装成 Activity progress：存储设备显示容量占用条、磁盘图标与容量色；支持 BlueZ Battery 的设备显示电量条、电池图标，并按电量改变颜色。图标按钮默认约 22px、圆形、只在 hover 时显示提示；内容必须避开顶部融合圆角，hover/按钮边框不得越出可见背景。专用任务只进入对应 page，不能重复出现在总 Activity page。
@@ -176,7 +178,7 @@ Launcher 的整组内容始终按 page 中线居中，不能因为右侧 disclos
 
 Media 启动光效只绘制饱和色的旋转边框，不能在渐变中点产生白色亮块。Dynamic bar 的斜纹动画由当前进度所有者的运行状态控制：running 时移动，paused 时立即停在当前相位，恢复后从该相位继续。
 
-第三方能力放在 `extensions/<id>/`，每项包含 `manifest.ini`，并通过 `sdk/live_activity.hpp` 的 v2 D-Bus 客户端发布 Activity；不得导入 Shell 内部对象。`island list` 统一枚举内置 progress adapter 与扩展 manifest。首个参考扩展 `file-operations` 提供带字节进度的递归 copy/move，跨文件系统移动必须完整复制成功后才删除源路径；Dynamic Bar 不在线时文件操作仍可独立完成。
+第三方能力放在 `extensions/<id>/`，每项包含 `manifest.ini`，并通过 `sdk/live_activity.hpp` 的 v2 D-Bus 客户端发布 Activity；不得导入 Shell 内部对象。所有扩展的公共入口统一为 `island -e EXTENSION ...`，扩展内部 executable 不单独加入 PATH。`island list` 统一枚举内置 progress adapter 与扩展 manifest。首个参考扩展注册为 `file`，通过 `island -e file help` 查看帮助，并以明确的 `copy FROM TO`、`move FROM TO`、`remove PATH` 子命令执行文件操作；跨文件系统移动必须完整复制成功后才删除源路径，Dynamic Bar 不在线时文件操作仍可独立完成。
 
 Activity 完成后的生命周期由 `Automatically remove completed activities` 和过期秒数统一控制；关闭自动移除时终态保留到用户 Stop tracking。显式由兼容 API 提供的 `expiresAt` 优先于全局默认。Island 已经展开时切歌只更新 Media page，不再发送重复的 small notification。固定 Activity 后它独占 dynamic bar 绘制层：Media 可以继续缓存播放进度，但 position 刷新、切歌 reset 和 activation 动画均不得覆盖固定进度；取消固定或固定任务消失后恢复最新 Media progress。
 

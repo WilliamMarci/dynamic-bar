@@ -24,6 +24,7 @@ island help
 island timer 25m --title "Focus"
 island inspect
 island demo
+island -e file copy FROM TO
 ```
 
 `-t` is the short form of `--title` and works with both `run` and `timer`.
@@ -58,3 +59,7 @@ only forwards `activityId + actionId`, so no command string crosses D-Bus.
 Third-party integrations can use `island start/update/done/fail/dismiss` or
 the versioned files in `../protocol/`. Minimal Bash and C++ examples live in
 `../sdk/`.
+
+Bundled extensions always use `island -e EXTENSION ...` as their public entry.
+Use `island list` to discover ids and concise usage, or
+`island -e EXTENSION help` for extension-specific help.

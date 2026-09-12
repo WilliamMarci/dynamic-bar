@@ -5,6 +5,8 @@ complete -c island -n '__fish_use_subcommand' -a 'help list inspect demo start u
 complete -c island -n '__fish_use_subcommand' -a '(__fish_complete_command)'
 complete -c island -s h -l help -d 'Show help'
 complete -c island -s t -l title -r -d 'Set activity title'
+complete -c island -s e -l extension -r -a 'file' -d 'Run an installed extension'
+complete -c island -n '__fish_seen_subcommand_from file' -a 'help copy move remove'
 complete -c island -n '__fish_seen_subcommand_from timer' -a '10s 30s 1m 5m 25m 1h'
 complete -c island -n '__fish_seen_subcommand_from demo' -a 'progress'
 complete -c island -n '__fish_seen_subcommand_from run' -a '(__fish_complete_command)'

@@ -2,11 +2,13 @@
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -75,25 +77,57 @@ private:
 };
 
 int main(int argc, char** argv) {
-    if (argc != 4 || (std::string(argv[1]) != "copy" &&
-        std::string(argv[1]) != "move")) {
-        std::cerr << "Usage: island-file copy|move SOURCE DESTINATION\n";
+    if (argc == 2 && (std::string(argv[1]) == "help" ||
+        std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+        std::cout << "Usage:\n"
+                  << "  island -e file copy SOURCE DESTINATION\n"
+                  << "  island -e file move SOURCE DESTINATION\n"
+                  << "  island -e file remove PATH\n";
+        return 0;
+    }
+    const std::string action = argc >= 2 ? argv[1] : "";
+    const bool removing = action == "remove";
+    if ((removing && argc != 3) || (!removing &&
+        (argc != 4 || (action != "copy" && action != "move")))) {
+        std::cerr << "Use 'island -e file help' for usage.\n";
         return 2;
     }
-    const bool moving = std::string(argv[1]) == "move";
+    const bool moving = action == "move";
     const fs::path source = fs::absolute(argv[2]);
-    fs::path destination = fs::absolute(argv[3]);
+    fs::path destination;
+    if (!removing)
+        destination = fs::absolute(argv[3]);
     if (!fs::exists(source)) {
         std::cerr << "island-file: source does not exist\n";
         return 2;
     }
-    if (fs::is_directory(destination))
+    if (!removing && fs::is_directory(destination))
         destination /= source.filename();
     const std::string id = std::to_string(getpid()) + "-file-operation";
     DynamicBar::LiveActivity activity(id,
-        std::string(moving ? "Moving " : "Copying ") + source.filename().string(),
+        std::string(removing ? "Removing " : moving ? "Moving " : "Copying ") +
+            source.filename().string(),
         "file-operations", "file");
     try {
+        if (removing) {
+            std::vector<fs::path> paths;
+            if (fs::is_directory(source) && !fs::is_symlink(source)) {
+                for (const auto& entry : fs::recursive_directory_iterator(source))
+                    paths.push_back(entry.path());
+            }
+            paths.push_back(source);
+            std::sort(paths.begin(), paths.end(), [](const auto& left, const auto& right) {
+                return std::distance(left.begin(), left.end()) >
+                    std::distance(right.begin(), right.end());
+            });
+            for (size_t index = 0; index < paths.size(); ++index) {
+                fs::remove(paths[index]);
+                activity.progress(double(index + 1) / paths.size(),
+                    paths[index].filename().string());
+            }
+            activity.finish(true, "Remove completed");
+            return 0;
+        }
         if (moving) {
             std::error_code error;
             fs::rename(source, destination, error);

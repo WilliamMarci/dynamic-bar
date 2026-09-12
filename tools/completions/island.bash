@@ -10,12 +10,21 @@ _island_complete() {
 
     command=${COMP_WORDS[1]}
     if (( COMP_CWORD == 1 )); then
-        COMPREPLY=( $(compgen -W 'run timer help list inspect demo start update done fail dismiss -h --help -t --title' -- "$cur")
+        COMPREPLY=( $(compgen -W 'run timer help list inspect demo start update done fail dismiss -e --extension -h --help -t --title' -- "$cur")
             $(compgen -c -- "$cur") )
         return 0
     fi
 
     case $command in
+        -e|--extension)
+            if (( COMP_CWORD == 2 )); then
+                COMPREPLY=( $(compgen -W 'file' -- "$cur") )
+            elif [[ ${COMP_WORDS[2]} == file && $COMP_CWORD == 3 ]]; then
+                COMPREPLY=( $(compgen -W 'help copy move remove' -- "$cur") )
+            else
+                _filedir
+            fi
+            ;;
         timer)
             if (( COMP_CWORD == 2 )); then
                 COMPREPLY=( $(compgen -W '10s 30s 1m 5m 25m 1h' -- "$cur") )

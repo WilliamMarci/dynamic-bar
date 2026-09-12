@@ -79,8 +79,79 @@ static void printHelp(std::ostream& out) {
         << "  island start ID [TITLE] | update ID PERCENT | done ID [SUMMARY]\n"
         << "  island fail ID [SUMMARY] | dismiss ID\n"
         << "  island timer DURATION[s|m|h] [-t|--title TITLE]\n\n"
+        << "  island -e EXTENSION [ARGS...]\n\n"
         << "The run subcommand is optional. Use 'island run' when a command is "
         << "literally named help or list.\n";
+}
+
+struct ExtensionInfo {
+    std::string id;
+    std::string commands;
+    std::string description;
+    std::filesystem::path entry;
+};
+
+static std::filesystem::path extensionsDirectory() {
+    std::error_code error;
+    const auto executable = std::filesystem::canonical("/proc/self/exe", error);
+    return error ? std::filesystem::path{} :
+        executable.parent_path().parent_path() / "extensions";
+}
+
+static std::vector<ExtensionInfo> installedExtensions() {
+    std::vector<ExtensionInfo> result;
+    const auto directory = extensionsDirectory();
+    if (directory.empty() || !std::filesystem::is_directory(directory))
+        return result;
+    for (const auto& item : std::filesystem::directory_iterator(directory)) {
+        const auto manifest = item.path() / "manifest.ini";
+        if (!std::filesystem::is_regular_file(manifest)) continue;
+        std::ifstream input(manifest);
+        ExtensionInfo info;
+        std::string line, entry;
+        while (std::getline(input, line)) {
+            const auto split = line.find('=');
+            if (split == std::string::npos) continue;
+            const auto key = line.substr(0, split);
+            const auto value = line.substr(split + 1);
+            if (key == "id") info.id = value;
+            else if (key == "commands") info.commands = value;
+            else if (key == "description") info.description = value;
+            else if (key == "entry") entry = value;
+        }
+        if (!info.id.empty() && !entry.empty()) {
+            info.entry = item.path() / entry;
+            result.push_back(std::move(info));
+        }
+    }
+    return result;
+}
+
+static int runExtension(int argc, char** argv) {
+    if (argc < 3) {
+        std::cerr << "Usage: island -e EXTENSION [ARGS...]\n";
+        return 2;
+    }
+    const std::string wanted = argv[2];
+    for (const auto& extension : installedExtensions()) {
+        if (extension.id != wanted) continue;
+        if (!std::filesystem::is_regular_file(extension.entry)) {
+            std::cerr << "island: extension '" << wanted
+                      << "' is installed but not built\n";
+            return 126;
+        }
+        std::vector<char*> args;
+        const auto executable = extension.entry.string();
+        args.push_back(const_cast<char*>(executable.c_str()));
+        for (int i = 3; i < argc; ++i) args.push_back(argv[i]);
+        args.push_back(nullptr);
+        execv(executable.c_str(), args.data());
+        std::cerr << "island: cannot start extension '" << wanted << "'\n";
+        return 126;
+    }
+    std::cerr << "island: unknown extension '" << wanted
+              << "' (use 'island list')\n";
+    return 2;
 }
 
 static void printAdapters() {
@@ -93,29 +164,13 @@ static void printAdapters() {
 
     // Out-of-process extensions are discovered from manifests beside tools/.
     // Their failures stay isolated from both this wrapper and GNOME Shell.
-    std::error_code error;
-    const auto executable = std::filesystem::canonical("/proc/self/exe", error);
-    const auto directory = executable.parent_path().parent_path() / "extensions";
-    if (!error && std::filesystem::is_directory(directory)) {
+    const auto extensions = installedExtensions();
+    if (!extensions.empty()) {
         std::cout << "\nInstalled extensions:\n";
-        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
-            const auto manifest = entry.path() / "manifest.ini";
-            if (!std::filesystem::is_regular_file(manifest)) continue;
-            std::ifstream input(manifest);
-            std::string line, id, commands, description;
-            while (std::getline(input, line)) {
-                const auto split = line.find('=');
-                if (split == std::string::npos) continue;
-                const auto key = line.substr(0, split);
-                const auto value = line.substr(split + 1);
-                if (key == "id") id = value;
-                else if (key == "commands") commands = value;
-                else if (key == "description") description = value;
-            }
-            if (!id.empty())
-                std::cout << "  " << id << "\n    commands: " << commands
-                          << "\n    " << description << "\n";
-        }
+        for (const auto& extension : extensions)
+            std::cout << "  " << extension.id << "\n    usage: island -e "
+                      << extension.id << ' ' << extension.commands
+                      << "\n    " << extension.description << "\n";
     }
 }
 
@@ -457,6 +512,8 @@ int main(int argc, char** argv) {
         printAdapters();
         return 0;
     }
+    if (first == "-e" || first == "--extension")
+        return runExtension(argc, argv);
     if (first == "timer") return createTimer(argc, argv);
     if (first == "inspect" || first == "demo" || first == "start" ||
         first == "update" || first == "done" || first == "fail" ||
