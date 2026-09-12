@@ -68,7 +68,7 @@ export class LiveActivityProvider extends BarProvider {
         this._settings = settings;
         this._tasks = new Map();
         this._listeners = new Set();
-        this._publishedGroups = new Set();
+        this._publishedDots = new Set();
         this._internalCallbacks = new Map();
         this._timers = new Map();
         this._cacheDir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'dynamic-bar']);
@@ -87,7 +87,7 @@ export class LiveActivityProvider extends BarProvider {
             LIVE_BUS_NAME, Gio.BusNameOwnerFlags.NONE, null, null);
         this._cleanupId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 15,
             () => this._housekeeping());
-        this._publishGroups();
+        this._publishDots();
     }
 
     get hasActivities() { return this._tasks.size > 0; }
@@ -239,32 +239,25 @@ export class LiveActivityProvider extends BarProvider {
     }
 
     _sync(_task) { this._changed(); }
-    _publishGroups() {
-        const groups = new Map();
-        const rank = status => ({error: 7, warning: 6, orphaned: 5, running: 4,
-            paused: 3, cancelled: 2, success: 1}[status] ?? 0);
+    _publishDots() {
+        const ids = new Set(this._tasks.keys());
+        for (const old of this._publishedDots) {
+            if (!ids.has(old)) this.bar.activityDot(old, false);
+        }
         for (const task of this._tasks.values()) {
-            const current = groups.get(task.group);
-            if (!current || rank(task.status) > rank(current.status))
-                groups.set(task.group, task);
-        }
-        for (const old of this._publishedGroups) {
-            if (!groups.has(old)) this.bar.activityDot(old, false);
-        }
-        for (const [group, task] of groups) {
             const progress = task.progress?.kind === 'determinate'
                 ? Number(task.progress.value) : NaN;
-            this.bar.activityDot(group, {status: task.status, progress,
+            this.bar.activityDot(task.id, {status: task.status, progress,
                 kind: task.group === 'timer' ? 'timer'
                     : task.group === 'device' ? 'device' : 'activity',
                 ring: task.ring, createdAt: task.createdAt,
-                onClick: () => this._focusGroup(group)});
+                onClick: () => this._focusTask(task)});
         }
-        this._publishedGroups = new Set(groups.keys());
+        this._publishedDots = ids;
     }
 
     _changed() {
-        this._publishGroups();
+        this._publishDots();
         this._persist();
         for (const listener of this._listeners) listener();
         const signature = this.getCards().map(card => card.id).join('|');
@@ -576,29 +569,23 @@ export class LiveActivityProvider extends BarProvider {
         return 'live-activities';
     }
 
-    _focusGroup(group) {
-        const rank = status => ({error: 5, warning: 4, orphaned: 3, running: 2,
-            paused: 1, success: 0}[status] ?? 0);
-        const task = [...this._tasks.values()]
-            .filter(item => item.group === group)
-            .sort((a, b) => rank(b.status) - rank(a.status) ||
-                b.updatedAt - a.updatedAt)[0];
-        if (task) {
-            this._selectedId = task.id;
-            this._selectedUntil = now() + 5000;
-            this._flashId = task.id;
-            if (this._flashTimerId)
-                GLib.source_remove(this._flashTimerId);
-            this._flashTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1400,
-                () => {
-                    this._flashTimerId = 0;
-                    this._flashId = null;
-                    if (this.bar.isShown(this))
-                        this.bar.cardsChanged();
-                    return GLib.SOURCE_REMOVE;
-                });
-        }
-        this.bar.focusCard(this._cardIdForGroup(group));
+    _focusTask(task) {
+        if (!task)
+            return;
+        this._selectedId = task.id;
+        this._selectedUntil = now() + 5000;
+        this._flashId = task.id;
+        if (this._flashTimerId)
+            GLib.source_remove(this._flashTimerId);
+        this._flashTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1400,
+            () => {
+                this._flashTimerId = 0;
+                this._flashId = null;
+                if (this.bar.isShown(this))
+                    this.bar.cardsChanged();
+                return GLib.SOURCE_REMOVE;
+            });
+        this.bar.focusCard(this._cardIdForGroup(task.group));
     }
 
     _createRow(task) {
@@ -743,7 +730,7 @@ export class LiveActivityProvider extends BarProvider {
             if (timer.sourceId) GLib.source_remove(timer.sourceId);
         }
         this._timers.clear();
-        for (const task of this._tasks.values()) this.bar.activityDot(task.group, false);
+        for (const task of this._tasks.values()) this.bar.activityDot(task.id, false);
         this._listeners.clear(); this._persist(); this._dbus.unexport();
         this._internalCallbacks.clear();
         Gio.bus_unown_name(this._ownerId);

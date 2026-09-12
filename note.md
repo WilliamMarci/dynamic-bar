@@ -190,7 +190,7 @@ Activity dot 列表以 dynamic bar 左侧图标区的右边缘为锚点，最新
 
 Activity dot 列表的最终锚点必须来自当前帧 dynamic bar progress track 的实际左端，而不是目标 bar 宽度、左右区最大自然宽度或动画结束后的预测位置。dot box 在 left zone 内右对齐，最右 dot 与当前 progress 左端之间始终保留 `ZONE_GAP`；bar 的 x/width 动画每帧变化时左右图标区同步跟随。
 
-所有折叠态状态圆点——`island` 外部命令、普通 Activity、Timer 和 Device——必须通过 `DynamicBarApi.activityDot()` 进入同一个动态 registry 与 `_activityBox` 容器，统一继承排序、空位收缩、hover 进度预览、点击聚焦、Shift 固定及销毁动画。旧 `activity()` 只保留为兼容别名。CardDeck 底部的 page 导航圆点表达页面位置，不是 Activity 状态，因此继续由 CardDeck 独立管理。
+所有折叠态状态圆点——`island run`、`island -e` 扩展任务、普通 Activity、Timer 和 Device——必须以“一任务一圆点”通过 `DynamicBarApi.activityDot()` 进入同一个动态 registry 与 `_activityBox` 容器，不得在发布前按 group 合并。圆点槽位从右向左编号，最右为 index 0；同类任务按创建时间保持稳定，新任务向左增加。Device 固定占据最大的若干 index（视觉上位于队列最左侧）。删除任意圆点后，仅空位左侧的圆点向右滑动补位，右侧圆点位置不变；所有点统一继承间距、hover 进度预览、点击精确聚焦对应任务、Shift 固定及销毁动画。旧 `activity()` 只保留为兼容别名。CardDeck 底部的 page 导航圆点表达页面位置，不是 Activity 状态，因此继续由 CardDeck 独立管理。
 
 所有 Card page 在功能自己的 `paddingX` 之外再叠加统一的 `Extra page side padding`，并通过固定总宽度且居中的几何 frame 分配，不能使用 CSS margin。展开/收回按钮移动到右侧单元格后，以按钮实际右上角为对齐点和变换 pivot；其背景或动效只能向左、向下占用空间，不能越过 island 的右边界。
 

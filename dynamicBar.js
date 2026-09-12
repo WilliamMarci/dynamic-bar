@@ -49,6 +49,7 @@ export const DEFAULTS = {
 
 const ZONE_SIZE = 20;
 const ZONE_GAP = 4;
+const ACTIVITY_DOT_GAP = 2;
 const PANEL_COLOR_POLL = 100;
 
 export const DynamicBar = GObject.registerClass({
@@ -89,6 +90,7 @@ export const DynamicBar = GObject.registerClass({
         this._indicators = new Map();
         this._activities = new Map();
         this._activityDotOrder = [];
+        this._activityDotActors = new Map();
         this._activityPreviewTimerId = 0;
         this._activityHovered = false;
         this._activityPinnedId = null;
@@ -155,7 +157,7 @@ export const DynamicBar = GObject.registerClass({
         });
         this._actor.add_child(this._leftZone);
         this._actor.add_child(this._rightZone);
-        this._activityBox = new St.BoxLayout({
+        this._activityBox = new St.Widget({
             style_class: 'dynamic-bar-activities',
             x_align: Clutter.ActorAlign.END,
             y_align: Clutter.ActorAlign.CENTER,
@@ -585,10 +587,19 @@ export const DynamicBar = GObject.registerClass({
     }
 
     setActivityDot(id, activity) {
+        let orderChanged = true;
         if (activity) {
             const isNew = !this._activities.has(id);
-            const state = activity === true ? {} : activity;
+            const previous = this._activities.get(id);
+            const incoming = activity === true ? {} : activity;
+            const previousKind = previous?.kind;
+            const previousCreatedAt = previous?.createdAt;
+            const state = previous
+                ? Object.assign(previous, incoming)
+                : incoming;
             this._activities.set(id, state);
+            orderChanged = isNew || previousKind !== state.kind ||
+                previousCreatedAt !== state.createdAt;
             if (this._activityPinnedId === id) {
                 const status = state.status ?? 'running';
                 const value = Number.isFinite(state.progress)
@@ -628,6 +639,10 @@ export const DynamicBar = GObject.registerClass({
                 this._syncBarPaint();
             }
             this._activities.delete(id);
+        }
+        if (activity && !orderChanged) {
+            this._refreshActivityDot(id);
+            return;
         }
         this._rebuildDots();
     }
@@ -696,18 +711,38 @@ export const DynamicBar = GObject.registerClass({
 
     _rebuildDots() {
         const oldOrder = this._activityDotOrder;
-        const newOrder = [...this._activities.keys()];
+        // Visual order is left-to-right, while the public slot index is
+        // measured from the right edge: the rightmost dot is index 0. Older
+        // work therefore remains on the right and new work grows leftward.
+        // Device indicators occupy the final (largest) slot indices, so they
+        // stay together at the far left without disturbing command dots.
+        const entries = [...this._activities.entries()].sort((left, right) => {
+            const leftDevice = left[1].kind === 'device';
+            const rightDevice = right[1].kind === 'device';
+            if (leftDevice !== rightDevice)
+                return leftDevice ? -1 : 1;
+            const created = Number(right[1].createdAt ?? 0) -
+                Number(left[1].createdAt ?? 0);
+            return created || right[0].localeCompare(left[0]);
+        });
+        const newOrder = entries.map(([id]) => id);
         const membershipChanged = oldOrder.length !== newOrder.length ||
             oldOrder.some((id, index) => newOrder[index] !== id);
         this._activityBox.remove_all_children();
+        this._activityDotActors.clear();
 
         const options = this._options;
         const size = Math.max(2, options.activityDotSize || options.barHeight);
         const border = Math.max(0, options.activityDotBorderWidth);
         const ringSize = size + border * 2;
         const hitSize = Math.max(options.activityDotHitSize, ringSize + 4, size + 6);
+        const slot = hitSize + ACTIVITY_DOT_GAP;
+        const trayWidth = entries.length > 0
+            ? entries.length * hitSize + (entries.length - 1) * ACTIVITY_DOT_GAP
+            : 0;
+        this._activityBox.set_size(trayWidth, hitSize);
 
-        for (const [activityId, state] of this._activities) {
+        entries.forEach(([activityId, state], visualIndex) => {
             const status = state.status ?? (state.completed ? 'success' : 'running');
             const color = this._activityDotColor(state);
 
@@ -720,6 +755,11 @@ export const DynamicBar = GObject.registerClass({
                 can_focus: true,
                 y_align: Clutter.ActorAlign.CENTER,
             });
+            // Explicit slot geometry: the tray itself is right-aligned beside
+            // the bar, and every child's position is derived from its index
+            // measured from that right edge.
+            const rightIndex = entries.length - 1 - visualIndex;
+            holder.set_position(trayWidth - hitSize - rightIndex * slot, 0);
 
             const visual = new St.Widget({
                 layout_manager: new Clutter.BinLayout(),
@@ -765,6 +805,8 @@ export const DynamicBar = GObject.registerClass({
             visual.add_child(dot);
 
             holder.add_child(visual);
+            this._activityDotActors.set(activityId, {holder, visual, dot, ring,
+                hoverRing});
 
             if (this._activityPinnedId === activityId) {
                 const triangle = this._makeTriangle(this._parseColor(color));
@@ -855,7 +897,6 @@ export const DynamicBar = GObject.registerClass({
                     const oldDistance = oldOrder.length - 1 - oldIndex;
                     const newDistance = newOrder.length - 1 -
                         newOrder.indexOf(activityId);
-                    const slot = hitSize + 2;
                     const delta = -(oldDistance - newDistance) * slot;
                     if (delta !== 0) {
                         holder.translation_x = delta;
@@ -864,9 +905,26 @@ export const DynamicBar = GObject.registerClass({
                     }
                 }
             }
-        }
+        });
         this._activityDotOrder = newOrder;
         this._syncLayout();
+    }
+
+    _refreshActivityDot(id) {
+        const state = this._activities.get(id);
+        const refs = this._activityDotActors.get(id);
+        if (!state || !refs) {
+            this._rebuildDots();
+            return;
+        }
+        const status = state.status ?? (state.completed ? 'success' : 'running');
+        refs.dot.set_style(`background-color: ${this._activityDotColor(state)};`);
+        const ringColor = typeof state.ring === 'string'
+            ? state.ring
+            : (status === 'success' ? 'rgba(255, 255, 255, 0.95)' : null);
+        refs.ring.visible = this._options.activityDotBorderWidth > 0 &&
+            Boolean(ringColor);
+        refs.ring.set_style(`background-color: ${ringColor ?? 'transparent'};`);
     }
 
     toggleActivityPin(id, state) {
