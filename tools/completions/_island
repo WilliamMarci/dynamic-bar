@@ -23,7 +23,9 @@ _island() {
           if (( CURRENT == 3 )); then
             _values 'extension' 'file[copy, move or remove files with progress]'
           elif [[ $line[2] == file ]]; then
-            _alternative 'actions:action:(help copy move remove)' 'files:file:_files'
+            _arguments '1:action:(help copy move remove)' \
+              '(-r --recursive)'{-r,--recursive}'[operate recursively]' \
+              '*:path:_files'
           fi
           ;;
         timer)

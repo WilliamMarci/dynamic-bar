@@ -21,6 +21,10 @@ _island_complete() {
                 COMPREPLY=( $(compgen -W 'file' -- "$cur") )
             elif [[ ${COMP_WORDS[2]} == file && $COMP_CWORD == 3 ]]; then
                 COMPREPLY=( $(compgen -W 'help copy move remove' -- "$cur") )
+            elif [[ ${COMP_WORDS[2]} == file &&
+                ( ${COMP_WORDS[3]} == copy || ${COMP_WORDS[3]} == remove ) &&
+                $cur == -* ]]; then
+                COMPREPLY=( $(compgen -W '-r --recursive' -- "$cur") )
             else
                 _filedir
             fi

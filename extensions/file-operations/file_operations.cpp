@@ -81,24 +81,38 @@ int main(int argc, char** argv) {
         std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         std::cout << "Usage:\n"
                   << "  island -e file copy SOURCE DESTINATION\n"
+                  << "  island -e file copy -r SOURCE DESTINATION\n"
                   << "  island -e file move SOURCE DESTINATION\n"
-                  << "  island -e file remove PATH\n";
+                  << "  island -e file remove PATH\n"
+                  << "  island -e file remove -r PATH\n\n"
+                  << "Directories require -r or --recursive for copy/remove.\n";
         return 0;
     }
     const std::string action = argc >= 2 ? argv[1] : "";
     const bool removing = action == "remove";
-    if ((removing && argc != 3) || (!removing &&
-        (argc != 4 || (action != "copy" && action != "move")))) {
+    const bool recursive = argc >= 3 && (std::string(argv[2]) == "-r" ||
+        std::string(argv[2]) == "--recursive");
+    const int sourceIndex = recursive ? 3 : 2;
+    const bool validRemove = removing && argc == sourceIndex + 1;
+    const bool validCopy = action == "copy" && argc == sourceIndex + 2;
+    const bool validMove = action == "move" && !recursive && argc == 4;
+    if (!validRemove && !validCopy && !validMove) {
         std::cerr << "Use 'island -e file help' for usage.\n";
         return 2;
     }
     const bool moving = action == "move";
-    const fs::path source = fs::absolute(argv[2]);
+    const fs::path source = fs::absolute(argv[sourceIndex]);
     fs::path destination;
     if (!removing)
-        destination = fs::absolute(argv[3]);
+        destination = fs::absolute(argv[sourceIndex + 1]);
     if (!fs::exists(source)) {
         std::cerr << "island-file: source does not exist\n";
+        return 2;
+    }
+    if (!moving && fs::is_directory(source) && !fs::is_symlink(source) &&
+        !recursive) {
+        std::cerr << "island-file: '" << action
+                  << "' of a directory requires -r or --recursive\n";
         return 2;
     }
     if (!removing && fs::is_directory(destination))

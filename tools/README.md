@@ -25,6 +25,7 @@ island timer 25m --title "Focus"
 island inspect
 island demo
 island -e file copy FROM TO
+island -e file copy -r DIRECTORY TO
 ```
 
 `-t` is the short form of `--title` and works with both `run` and `timer`.

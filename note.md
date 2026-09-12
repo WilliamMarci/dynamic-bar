@@ -178,7 +178,7 @@ Launcher 的整组内容始终按 page 中线居中，不能因为右侧 disclos
 
 Media 启动光效只绘制饱和色的旋转边框，不能在渐变中点产生白色亮块。Dynamic bar 的斜纹动画由当前进度所有者的运行状态控制：running 时移动，paused 时立即停在当前相位，恢复后从该相位继续。
 
-第三方能力放在 `extensions/<id>/`，每项包含 `manifest.ini`，并通过 `sdk/live_activity.hpp` 的 v2 D-Bus 客户端发布 Activity；不得导入 Shell 内部对象。所有扩展的公共入口统一为 `island -e EXTENSION ...`，扩展内部 executable 不单独加入 PATH。`island list` 统一枚举内置 progress adapter 与扩展 manifest。首个参考扩展注册为 `file`，通过 `island -e file help` 查看帮助，并以明确的 `copy FROM TO`、`move FROM TO`、`remove PATH` 子命令执行文件操作；跨文件系统移动必须完整复制成功后才删除源路径，Dynamic Bar 不在线时文件操作仍可独立完成。
+第三方能力放在 `extensions/<id>/`，每项包含 `manifest.ini`，并通过 `sdk/live_activity.hpp` 的 v2 D-Bus 客户端发布 Activity；不得导入 Shell 内部对象。所有扩展的公共入口统一为 `island -e EXTENSION ...`，扩展内部 executable 不单独加入 PATH。`island list` 统一枚举内置 progress adapter 与扩展 manifest。首个参考扩展注册为 `file`，通过 `island -e file help` 查看帮助，并以明确的 `copy FROM TO`、`move FROM TO`、`remove PATH` 子命令执行文件操作。与 Linux 工具一致，copy/remove 操作目录时必须显式使用 `-r` 或 `--recursive`，move 目录不要求该参数；跨文件系统移动必须完整复制成功后才删除源路径，Dynamic Bar 不在线时文件操作仍可独立完成。
 
 Activity 完成后的生命周期由 `Automatically remove completed activities` 和过期秒数统一控制；关闭自动移除时终态保留到用户 Stop tracking。显式由兼容 API 提供的 `expiresAt` 优先于全局默认。Island 已经展开时切歌只更新 Media page，不再发送重复的 small notification。固定 Activity 后它独占 dynamic bar 绘制层：Media 可以继续缓存播放进度，但 position 刷新、切歌 reset 和 activation 动画均不得覆盖固定进度；取消固定或固定任务消失后恢复最新 Media progress。
 
