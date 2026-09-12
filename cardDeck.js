@@ -145,8 +145,12 @@ export class IslandCardDeck {
         this._cardHolder = new St.Widget({
             layout_manager: new Clutter.BinLayout(),
             x_expand: true,
+            width: this._pageWidth(),
+            x_align: Clutter.ActorAlign.CENTER,
             clip_to_allocation: true,
         });
+        this._cardHolder.connect('notify::allocation', () =>
+            this._syncCardViewport());
         this._root.add_child(this._cardHolder);
 
         this._strip = new St.BoxLayout({
@@ -252,6 +256,17 @@ export class IslandCardDeck {
         return this._settings.get_int('card-page-edge-padding');
     }
 
+    _syncCardViewport() {
+        if (!this._cardHolder)
+            return;
+        const width = Math.max(0, this._cardHolder.width);
+        const height = Math.max(0, this._cardHolder.height);
+        // Clutter's clip_to_allocation can lag one paint during translated
+        // sibling transitions. An explicit viewport clip is updated from the
+        // actual allocation and takes effect for the same paint cycle.
+        this._cardHolder.set_clip(0, 0, width, height);
+    }
+
     destroy() {
         this._finishRetiringFrames();
         this._destroyCard();
@@ -298,6 +313,7 @@ export class IslandCardDeck {
                 layout_manager: new Clutter.BinLayout(),
                 width: this._pageWidth(),
                 x_align: Clutter.ActorAlign.CENTER,
+                clip_to_allocation: true,
             });
             this._cardFrame.add_child(this._cardActor);
             this._cardHolder.add_child(this._cardFrame);
@@ -314,7 +330,8 @@ export class IslandCardDeck {
                 };
                 if (animate) {
                     this._retiringFrames.push({frame: oldFrame, index: oldIndex});
-                    const distance = this._pageWidth();
+                    this._syncCardViewport();
+                    const distance = Math.max(1, this._cardHolder.width);
                     this._cardFrame.translation_x = direction * distance;
                     this._cardFrame.opacity = 180;
                     oldFrame.ease({
