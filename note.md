@@ -190,6 +190,8 @@ Activity dot 列表以 dynamic bar 左侧图标区的右边缘为锚点，最新
 
 Activity dot 列表的最终锚点必须来自当前帧 dynamic bar progress track 的实际左端，而不是目标 bar 宽度、左右区最大自然宽度或动画结束后的预测位置。dot box 在 left zone 内右对齐，最右 dot 与当前 progress 左端之间始终保留 `ZONE_GAP`；bar 的 x/width 动画每帧变化时左右图标区同步跟随。
 
+所有折叠态状态圆点——`island` 外部命令、普通 Activity、Timer 和 Device——必须通过 `DynamicBarApi.activityDot()` 进入同一个动态 registry 与 `_activityBox` 容器，统一继承排序、空位收缩、hover 进度预览、点击聚焦、Shift 固定及销毁动画。旧 `activity()` 只保留为兼容别名。CardDeck 底部的 page 导航圆点表达页面位置，不是 Activity 状态，因此继续由 CardDeck 独立管理。
+
 所有 Card page 在功能自己的 `paddingX` 之外再叠加统一的 `Extra page side padding`，并通过固定总宽度且居中的几何 frame 分配，不能使用 CSS margin。展开/收回按钮移动到右侧单元格后，以按钮实际右上角为对齐点和变换 pivot；其背景或动效只能向左、向下占用空间，不能越过 island 的右边界。
 
 Stop tracking 必须能删除最后一项；最后一项消失后对应 page 立即从 deck 移除，若没有其他卡片则回退到 Launcher。Island 自动收回必须同时检查背景、内容 holder 和 bar 的 hover，鼠标位于任何 island 内容上时不得收回。可恢复错误统一用 `[Dynamic Bar][模块]` 结构写入 GNOME Shell journal，并携带对象 ID 或配置项上下文，禁止吞掉解析、图标、卡片创建和设备操作异常。

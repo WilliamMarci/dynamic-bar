@@ -249,12 +249,12 @@ export class LiveActivityProvider extends BarProvider {
                 groups.set(task.group, task);
         }
         for (const old of this._publishedGroups) {
-            if (!groups.has(old)) this.bar.activity(old, false);
+            if (!groups.has(old)) this.bar.activityDot(old, false);
         }
         for (const [group, task] of groups) {
             const progress = task.progress?.kind === 'determinate'
                 ? Number(task.progress.value) : NaN;
-            this.bar.activity(group, {status: task.status, progress,
+            this.bar.activityDot(group, {status: task.status, progress,
                 kind: task.group === 'timer' ? 'timer'
                     : task.group === 'device' ? 'device' : 'activity',
                 ring: task.ring, createdAt: task.createdAt,
@@ -743,7 +743,7 @@ export class LiveActivityProvider extends BarProvider {
             if (timer.sourceId) GLib.source_remove(timer.sourceId);
         }
         this._timers.clear();
-        for (const task of this._tasks.values()) this.bar.activity(task.group, false);
+        for (const task of this._tasks.values()) this.bar.activityDot(task.group, false);
         this._listeners.clear(); this._persist(); this._dbus.unexport();
         this._internalCallbacks.clear();
         Gio.bus_unown_name(this._ownerId);

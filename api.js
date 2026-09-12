@@ -18,8 +18,13 @@ export class DynamicBarApi {
         this._controller.setStatus(id, actor);
     }
 
-    activity(id, active = true) {
-        this._controller.setActivity(id, active);
+    activityDot(id, state = true) {
+        this._controller.setActivityDot(id, state);
+    }
+
+    /** Compatibility alias for providers written before the dot registry. */
+    activity(id, state = true) {
+        this.activityDot(id, state);
     }
 
     notification(provider, options = {}) {

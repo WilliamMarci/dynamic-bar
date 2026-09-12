@@ -584,7 +584,7 @@ export const DynamicBar = GObject.registerClass({
         };
     }
 
-    setActivity(id, activity) {
+    setActivityDot(id, activity) {
         if (activity) {
             const isNew = !this._activities.has(id);
             const state = activity === true ? {} : activity;
@@ -630,6 +630,12 @@ export const DynamicBar = GObject.registerClass({
             this._activities.delete(id);
         }
         this._rebuildDots();
+    }
+
+    // Compatibility for callers using the original provider API. All state
+    // dots still enter the same registry and render container.
+    setActivity(id, activity) {
+        this.setActivityDot(id, activity);
     }
 
     _parseColor(value) {
