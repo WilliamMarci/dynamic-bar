@@ -194,6 +194,8 @@ Activity dot 列表的最终锚点必须来自当前帧 dynamic bar progress tra
 
 新增 Device dot 使用专用插入动画：已有 dots 按新增 Device 的槽位数量整体向右滑动腾位，Device 从 dynamic bar 下方向上进入并淡入。该动画只由 registry 成员新增触发，电量、容量、颜色和连接状态刷新不得重复播放。
 
+Dot 排列与进入动画必须由统一 policy 描述，布局主循环不得按 Provider 名称写死分支。Placement 至少提供 `leading`、`normal`、`index-zero` 三个区域，Insertion 至少提供 `pop` 与 `rise-and-shift`。Device 使用 `leading + rise-and-shift`；普通 Activity 使用 `normal + pop`；Timer 使用 `index-zero + pop`。因此 Timer 区始终位于最右侧，多个 Timer 中最新创建者严格占据 index 0，其余向左排列。新增类型只需声明 policy 即可复用槽位计算和补位动画。
+
 所有 Card page 在功能自己的 `paddingX` 之外再叠加统一的 `Extra page side padding`，并通过固定总宽度且居中的几何 frame 分配，不能使用 CSS margin。展开/收回按钮移动到右侧单元格后，以按钮实际右上角为对齐点和变换 pivot；其背景或动效只能向左、向下占用空间，不能越过 island 的右边界。
 
 Stop tracking 必须能删除最后一项；最后一项消失后对应 page 立即从 deck 移除，若没有其他卡片则回退到 Launcher。Island 自动收回必须同时检查背景、内容 holder 和 bar 的 hover，鼠标位于任何 island 内容上时不得收回。可恢复错误统一用 `[Dynamic Bar][模块]` 结构写入 GNOME Shell journal，并携带对象 ID 或配置项上下文，禁止吞掉解析、图标、卡片创建和设备操作异常。

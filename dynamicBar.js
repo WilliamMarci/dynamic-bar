@@ -50,6 +50,15 @@ export const DEFAULTS = {
 const ZONE_SIZE = 20;
 const ZONE_GAP = 4;
 const ACTIVITY_DOT_GAP = 2;
+const DOT_PLACEMENT = Object.freeze({
+    LEADING: 'leading',
+    NORMAL: 'normal',
+    INDEX_ZERO: 'index-zero',
+});
+const DOT_INSERTION = Object.freeze({
+    POP: 'pop',
+    RISE_AND_SHIFT: 'rise-and-shift',
+});
 const PANEL_COLOR_POLL = 100;
 
 export const DynamicBar = GObject.registerClass({
@@ -91,6 +100,7 @@ export const DynamicBar = GObject.registerClass({
         this._activities = new Map();
         this._activityDotOrder = [];
         this._activityDotActors = new Map();
+        this._activityDotSequence = 0;
         this._activityPreviewTimerId = 0;
         this._activityHovered = false;
         this._activityPinnedId = null;
@@ -597,6 +607,8 @@ export const DynamicBar = GObject.registerClass({
             const state = previous
                 ? Object.assign(previous, incoming)
                 : incoming;
+            if (isNew)
+                state._dotSequence = ++this._activityDotSequence;
             this._activities.set(id, state);
             orderChanged = isNew || previousKind !== state.kind ||
                 previousCreatedAt !== state.createdAt;
@@ -709,6 +721,51 @@ export const DynamicBar = GObject.registerClass({
         return area;
     }
 
+    _activityDotPolicy(state) {
+        if (state.kind === 'device') {
+            return {
+                placement: DOT_PLACEMENT.LEADING,
+                insertion: DOT_INSERTION.RISE_AND_SHIFT,
+                placementRank: 0,
+                newestAtRight: false,
+                shiftsExisting: true,
+            };
+        }
+        if (state.kind === 'timer') {
+            return {
+                placement: DOT_PLACEMENT.INDEX_ZERO,
+                insertion: DOT_INSERTION.POP,
+                placementRank: 2,
+                newestAtRight: true,
+                shiftsExisting: false,
+            };
+        }
+        return {
+            placement: DOT_PLACEMENT.NORMAL,
+            insertion: DOT_INSERTION.POP,
+            placementRank: 1,
+            newestAtRight: false,
+            shiftsExisting: false,
+        };
+    }
+
+    _compareActivityDots(left, right) {
+        const leftPolicy = this._activityDotPolicy(left[1]);
+        const rightPolicy = this._activityDotPolicy(right[1]);
+        if (leftPolicy.placementRank !== rightPolicy.placementRank)
+            return leftPolicy.placementRank - rightPolicy.placementRank;
+        const leftCreated = Number(left[1]._dotSequence ??
+            left[1].createdAt ?? 0);
+        const rightCreated = Number(right[1]._dotSequence ??
+            right[1].createdAt ?? 0);
+        // Visual order is left-to-right. index-zero lanes place their newest
+        // member at the right edge; other lanes grow toward the left.
+        const created = leftPolicy.newestAtRight
+            ? leftCreated - rightCreated
+            : rightCreated - leftCreated;
+        return created || right[0].localeCompare(left[0]);
+    }
+
     _rebuildDots() {
         const oldOrder = this._activityDotOrder;
         // Visual order is left-to-right, while the public slot index is
@@ -716,21 +773,18 @@ export const DynamicBar = GObject.registerClass({
         // work therefore remains on the right and new work grows leftward.
         // Device indicators occupy the final (largest) slot indices, so they
         // stay together at the far left without disturbing command dots.
-        const entries = [...this._activities.entries()].sort((left, right) => {
-            const leftDevice = left[1].kind === 'device';
-            const rightDevice = right[1].kind === 'device';
-            if (leftDevice !== rightDevice)
-                return leftDevice ? -1 : 1;
-            const created = Number(right[1].createdAt ?? 0) -
-                Number(left[1].createdAt ?? 0);
-            return created || right[0].localeCompare(left[0]);
-        });
+        const entries = [...this._activities.entries()]
+            .sort((left, right) => this._compareActivityDots(left, right));
         const newOrder = entries.map(([id]) => id);
-        const insertedDeviceIds = new Set(entries
-            .filter(([id, state]) => state.kind === 'device' &&
-                !oldOrder.includes(id))
+        const insertedPolicies = new Map(entries
+            .filter(([id]) => !oldOrder.includes(id))
+            .map(([id, state]) => [id, this._activityDotPolicy(state)]));
+        const shiftingInsertions = [...insertedPolicies.values()]
+            .filter(policy => policy.shiftsExisting).length;
+        const risingIds = new Set([...insertedPolicies]
+            .filter(([, policy]) =>
+                policy.insertion === DOT_INSERTION.RISE_AND_SHIFT)
             .map(([id]) => id));
-        const insertedDeviceSlots = insertedDeviceIds.size;
         const membershipChanged = oldOrder.length !== newOrder.length ||
             oldOrder.some((id, index) => newOrder[index] !== id);
         this._activityBox.remove_all_children();
@@ -889,9 +943,9 @@ export const DynamicBar = GObject.registerClass({
             if (membershipChanged && this._options.animationsEnabled) {
                 const oldIndex = oldOrder.indexOf(activityId);
                 if (oldIndex < 0) {
-                    if (insertedDeviceIds.has(activityId)) {
-                        // A device joins from below after the existing row
-                        // visibly makes room for its reserved left-hand slot.
+                    if (risingIds.has(activityId)) {
+                        // The policy may reserve a slot while its dot rises
+                        // from below; this is not tied to a concrete provider.
                         holder.translation_y = hitSize + ACTIVITY_DOT_GAP + 3;
                         visual.opacity = 0;
                         holder.ease({translation_y: 0, duration: 240,
@@ -917,8 +971,8 @@ export const DynamicBar = GObject.registerClass({
                     // Device insertion is deliberately more expressive than
                     // ordinary task insertion: all existing dots travel
                     // right by one slot while the device rises into the gap.
-                    if (insertedDeviceSlots > 0)
-                        delta -= insertedDeviceSlots * slot;
+                    if (shiftingInsertions > 0)
+                        delta -= shiftingInsertions * slot;
                     if (delta !== 0) {
                         holder.translation_x = delta;
                         holder.ease({translation_x: 0, duration: 220,
