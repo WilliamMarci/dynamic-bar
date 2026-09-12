@@ -160,7 +160,7 @@ Activity action 必须是 `activityId + actionId` 回调，Shell 不执行第三
 
 `island run` 直接 exec 参数、透传输出和退出码，在插件不可用时照常执行原命令。失败卡片提供 Retry：由 wrapper 的分离监听进程收到 `ActionRequested(id, "retry")` 后自行重启原始参数，Shell 不生成本命令字符串。日志去除 ANSI 后写入用户 cache，单文件上限 1 MiB 并保留一份轮转；D-Bus 只保存摘要与路径。协议、JSON Schema、Bash/C++ 示例及 inspect/demo 调试命令必须同步维护。
 
-Timer 使用 monotonic time；暂停时停止刷新，恢复后按剩余时间重建 deadline，没有计时器时不得保留一秒刷新源。打印只消费 CUPS notifier 明确广播的可见任务，不扫描队列；按 notifier 的 11 参数 Job 信号与 6 参数 Printer 信号解析，job-state 用 IPP 枚举（processing/held/stopped/canceled/aborted/completed）；页数未知显示 `N/?`，不得伪造百分比。U 盘只由 `Gio.VolumeMonitor` 事件驱动，并区分 unmount/eject 与物理断电。GNOME 通知转接默认关闭，使用独立开关与 application ID 过滤表，且只生成 small notification，不实现第二个通知中心。
+Timer 使用 monotonic time；暂停时停止刷新，恢复后按剩余时间重建 deadline，没有计时器时不得保留一秒刷新源。打印只消费 CUPS notifier 明确广播的可见任务，不扫描队列；按 notifier 的 11 参数 Job 信号与 6 参数 Printer 信号解析，job-state 用 IPP 枚举（processing/held/stopped/canceled/aborted/completed）；页数未知显示 `N/?`，不得伪造百分比。U 盘只由 `Gio.VolumeMonitor` 事件驱动，并区分 unmount/eject 与物理断电。GNOME 通知转接默认关闭，使用独立开关与 application ID 过滤表，且只生成 small notification，不实现第二个通知中心。`notification-forwarding-details` 独立控制是否把正文接在标题后；开启时格式为 `标题  🚨︎  正文`，中间警灯必须使用 Unicode 文本呈现而不是彩色 Emoji，正文换行折叠为空格，完整字段在同一个单行 viewport 中滚动，不增加 notification 高度；正文为空或与标题相同时不插入警灯。
 
 Dynamic bar 与 island 内的 progress bar 是两个内部差异很大的独立组件，不能共用绘制函数、actor 或动画状态。`barBackground.js` 独立负责 bar 的几何、激活光效、常驻进度和 Activity 预览；`progressBar.js` 只负责 island 卡片内部的进度控件。两者可以遵循一致的圆角视觉语言，但实现依赖必须单向停留在各自模块内。Media 保留原来的白色视觉、4/6px 状态高度与 seek，Timer、Live Activity、Removable 和 Printing 在 island progress 控件上参数化主题色、斜纹和状态。新增卡片的标准动作统一使用 `controls.js` 的圆形图标按钮，常态不显示文字背景，hover/focus 才显示圆形反馈和动作提示。动作集合必须随状态裁剪，例如 Timer running 只显示 Pause，paused 只显示 Resume，结束后不再显示运行控制。
 

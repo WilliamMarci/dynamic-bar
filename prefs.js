@@ -589,6 +589,8 @@ export default class DynamicBarPreferences extends ExtensionPreferences {
         addSwitchRow(featureGroup, settings, 'media-enabled', 'Media playback');
         addSwitchRow(featureGroup, settings, 'notifications-enabled', 'Dynamic Bar notifications');
         addSwitchRow(featureGroup, settings, 'notification-forwarding-enabled', 'Forward GNOME notifications');
+        addSwitchRow(featureGroup, settings, 'notification-forwarding-details',
+            'Forward notification details');
         addSwitchRow(featureGroup, settings, 'printing-enabled', 'Printing activities');
         addSwitchRow(featureGroup, settings, 'bluetooth-enabled', 'Bluetooth notifications');
         addSwitchRow(featureGroup, settings, 'charging-enabled', 'Charging notifications');
