@@ -202,6 +202,8 @@ Dot tray 的分组顺序显式定义为 `[Device | Activity | Timer]`（视觉�
 
 多 page 模式的 disclosure toggle 必须完全位于 island 内：左右控制 cell 对称包含 `card-page-edge-padding`，右侧按钮占固定 38px 并放在 right cell 的左侧，cell 尾部留下真实边距且裁剪主题绘制。GNOME 主题的按钮最小宽度不得把 hover/focus 背景撑出 island；动画或展开计算仍以按钮自身右上角为基点。
 
+Island 或 attached Launcher 展开时，点击 island、dynamic bar 或左右状态区以外的任意位置必须立即收回（显式 pinned 状态除外）。Outside-click 不能只依赖 event actor 父链；GNOME top chrome 下必须同时用 stage 坐标命中 island/bar/zone 的真实 transformed rectangle。Launcher 属于 island 矩形内部，点击其控件不得触发误收回。
+
 所有 Card page 在功能自己的 `paddingX` 之外再叠加统一的 `Extra page side padding`，并通过固定总宽度且居中的几何 frame 分配，不能使用 CSS margin。展开/收回按钮移动到右侧单元格后，以按钮实际右上角为对齐点和变换 pivot；其背景或动效只能向左、向下占用空间，不能越过 island 的右边界。
 
 Stop tracking 必须能删除最后一项；最后一项消失后对应 page 立即从 deck 移除，若没有其他卡片则回退到 Launcher。Island 自动收回必须同时检查背景、内容 holder 和 bar 的 hover，鼠标位于任何 island 内容上时不得收回。可恢复错误统一用 `[Dynamic Bar][模块]` 结构写入 GNOME Shell journal，并携带对象 ID 或配置项上下文，禁止吞掉解析、图标、卡片创建和设备操作异常。

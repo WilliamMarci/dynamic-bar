@@ -1304,11 +1304,13 @@ export const DynamicBar = GObject.registerClass({
         if (this._destroyed || !this._expanded || this._pinned)
             return Clutter.EVENT_PROPAGATE;
 
-        if (event.get_button() !== 1)
-            return Clutter.EVENT_PROPAGATE;
-
-        const target = global.stage.get_event_actor(event);
-        if (this._contains(target))
+        let target = null;
+        try {
+            target = event.get_source?.() ?? global.stage.get_event_actor(event);
+        } catch (error) {
+            logError('Island', error, 'resolve captured-event actor');
+        }
+        if (this._contains(target) || this._eventInsideSurface(event))
             return Clutter.EVENT_PROPAGATE;
 
         this.collapse();
@@ -1321,6 +1323,32 @@ export const DynamicBar = GObject.registerClass({
                 return true;
         }
         return false;
+    }
+
+    _eventInsideSurface(event) {
+        let stageX;
+        let stageY;
+        try {
+            [stageX, stageY] = event.get_coords();
+        } catch (error) {
+            logError('Island', error, 'read captured-event coordinates');
+            return false;
+        }
+        const containsPoint = actor => {
+            if (!actor?.visible || actor.opacity === 0 ||
+                actor.width <= 0 || actor.height <= 0)
+                return false;
+            try {
+                const [x, y] = actor.get_transformed_position();
+                const [width, height] = actor.get_transformed_size();
+                return stageX >= x && stageX < x + width &&
+                    stageY >= y && stageY < y + height;
+            } catch {
+                return false;
+            }
+        };
+        return containsPoint(this._island) || containsPoint(this._bar) ||
+            containsPoint(this._leftZone) || containsPoint(this._rightZone);
     }
 
     _onHoverChanged() {
