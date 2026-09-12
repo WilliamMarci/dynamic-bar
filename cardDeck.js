@@ -408,16 +408,22 @@ export class IslandCardDeck {
                 this.selectCard((this._activeIndex + 1) % this._cards.length, 1);
         });
 
-        // Fixed 38px side cells keep the navigation exactly centered while the
-        // disclosure button is pinned to the trailing edge.
+        // Symmetric side cells keep navigation centred. In multi-page mode
+        // they also include the page edge inset, so the toggle's painted and
+        // reactive bounds remain inside the island rather than merely
+        // aligning its allocation to the outer edge.
         if (this._cards.length > 1) {
-            this._strip.add_child(new St.Widget({width: 38}));
+            const sideWidth = 38 + this._pageEdgePadding();
+            this._strip.add_child(new St.Widget({width: sideWidth}));
             this._strip.add_child(this._centerCell(this._buildNavigation()));
             const right = new St.Widget({
-                width: 38,
+                width: sideWidth,
                 layout_manager: new Clutter.BinLayout(),
+                clip_to_allocation: true,
             });
-            this._toggle.x_align = Clutter.ActorAlign.END;
+            // START leaves the page-edge portion empty on the trailing side.
+            // The button's own right-top remains the disclosure anchor.
+            this._toggle.x_align = Clutter.ActorAlign.START;
             this._toggle.y_align = Clutter.ActorAlign.START;
             this._toggle.set_pivot_point(1, 0);
             right.add_child(this._toggle);
