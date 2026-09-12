@@ -202,6 +202,8 @@ Dot tray 的分组顺序显式定义为 `[Device | Activity | Timer]`（视觉�
 
 多 page 模式的 disclosure toggle 必须完全位于 island 内：左右控制 cell 对称包含 `card-page-edge-padding`，右侧按钮占固定 38px 并放在 right cell 的左侧，cell 尾部留下真实边距且裁剪主题绘制。GNOME 主题的按钮最小宽度不得把 hover/focus 背景撑出 island；动画或展开计算仍以按钮自身右上角为基点。
 
+多 page 模式的右侧 disclosure toggle 在 page edge padding 基础上再向中心内收固定 20px；左侧控制占位同步增加 20px，保证中间 page 导航点仍严格居中。单 page 模式的居中 toggle 不应用此偏移。
+
 Island 或 attached Launcher 展开时，点击 island、dynamic bar 或左右状态区以外的任意位置必须立即收回（显式 pinned 状态除外）。Outside-click 不能只依赖 event actor 父链；GNOME top chrome 下必须同时用 stage 坐标命中 island/bar/zone 的真实 transformed rectangle。Launcher 属于 island 矩形内部，点击其控件不得触发误收回。
 
 Page 左右切换动画必须在固定宽度的 CardDeck viewport 内绘制。Viewport 宽度等于当前 `card-page-width`，在每次 allocation 后用真实 width/height 设置显式 clip rectangle；每个 page frame 也裁剪自身 allocation。旧页与新页的平移距离取 viewport 实际宽度，不能依赖可能滞后一帧的 `clip_to_allocation`，任何动画帧都不得把内容绘制到 island 外。

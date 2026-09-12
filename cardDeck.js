@@ -5,6 +5,9 @@ import St from 'gi://St';
 
 import {logError} from './log.js';
 
+const DISCLOSURE_WIDTH = 38;
+const DISCLOSURE_INSET = 20;
+
 function makeChevron() {
     const area = new St.DrawingArea();
     area.set_size(16, 16);
@@ -412,7 +415,7 @@ export class IslandCardDeck {
         this._toggle = new St.Button({
             style_class: 'dynamic-bar-control-toggle',
             child: this._toggleIcon,
-            width: 38,
+            width: DISCLOSURE_WIDTH,
             height: this._controlHeight(),
             can_focus: true,
             visible: showToggle,
@@ -430,7 +433,8 @@ export class IslandCardDeck {
         // reactive bounds remain inside the island rather than merely
         // aligning its allocation to the outer edge.
         if (this._cards.length > 1) {
-            const sideWidth = 38 + this._pageEdgePadding();
+            const sideWidth = DISCLOSURE_WIDTH + this._pageEdgePadding() +
+                DISCLOSURE_INSET;
             this._strip.add_child(new St.Widget({width: sideWidth}));
             this._strip.add_child(this._centerCell(this._buildNavigation()));
             const right = new St.Widget({
@@ -446,9 +450,9 @@ export class IslandCardDeck {
             right.add_child(this._toggle);
             this._strip.add_child(right);
         } else {
-            this._strip.add_child(new St.Widget({width: 38}));
+            this._strip.add_child(new St.Widget({width: DISCLOSURE_WIDTH}));
             this._strip.add_child(this._centerCell(this._toggle));
-            this._strip.add_child(new St.Widget({width: 38}));
+            this._strip.add_child(new St.Widget({width: DISCLOSURE_WIDTH}));
         }
     }
 
