@@ -3,7 +3,8 @@ import GLib from 'gi://GLib';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {BarProvider, smallNotificationHeight, smallNotificationLabel}
+import {BarProvider, smallNotificationDuration, smallNotificationHeight,
+    smallNotificationLabel}
     from '../provider.js';
 
 export class NotificationBridgeProvider extends BarProvider {
@@ -41,7 +42,7 @@ export class NotificationBridgeProvider extends BarProvider {
         // existing viewport then scrolls the complete field when necessary.
         const details = String(rawDetails ?? '').replace(/\s+/g, ' ').trim();
         const text = details && details !== title
-            ? `${title}  🚨︎  ${details}`
+            ? `${title}  🔔︎  ${details}`
             : String(title);
         const height = smallNotificationHeight(this._settings);
         const provider = {createIslandActor: () => {
@@ -60,7 +61,8 @@ export class NotificationBridgeProvider extends BarProvider {
             });
             return viewport;
         }, destroyIslandActor() {}};
-        this.bar.notification(provider, {timeout: 1400, passive: true,
+        this.bar.notification(provider, {
+            timeout: smallNotificationDuration(this._settings), passive: true,
             width: 192, height, paddingX: 8, paddingY: 0});
     }
 

@@ -5,6 +5,10 @@ export function smallNotificationHeight(settings, fallback = 10) {
     return settings?.get_int?.('small-notification-height') ?? fallback;
 }
 
+export function smallNotificationDuration(settings, fallback = 1800) {
+    return settings?.get_int?.('small-notification-duration') ?? fallback;
+}
+
 export function smallNotificationLabel(text, settings) {
     const label = new St.Label({
         text,

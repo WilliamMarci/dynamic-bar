@@ -4,7 +4,8 @@ import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
-import {BarProvider, smallNotificationHeight, smallNotificationLabel}
+import {BarProvider, smallNotificationDuration, smallNotificationHeight,
+    smallNotificationLabel}
     from '../provider.js';
 import {createIconButton} from '../controls.js';
 import {createProgressBar} from '../progressBar.js';
@@ -334,7 +335,8 @@ export class LiveActivityProvider extends BarProvider {
         const height = smallNotificationHeight(this._settings);
         this.bar.notification({createIslandActor: () =>
             smallNotificationLabel(text, this._settings), destroyIslandActor() {}},
-        {timeout: 1200, passive: true, height, paddingX: 8, paddingY: 0});
+        {timeout: smallNotificationDuration(this._settings), passive: true,
+            height, paddingX: 8, paddingY: 0});
     }
 
     _notifyComplete(task) {

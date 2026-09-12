@@ -244,6 +244,11 @@
       <summary>Small notification font size</summary>
       <description>Font size of the small notification label in pixels.</description>
     </key>
+    <key name="small-notification-duration" type="i">
+      <default>1800</default>
+      <summary>Small notification duration</summary>
+      <description>Display duration of low-profile small notifications in milliseconds.</description>
+    </key>
     <key name="removable-mounted-color" type="s">
       <default>'#3584e4'</default>
       <summary>Mounted volume ring color</summary>
@@ -288,7 +293,7 @@
     <key name="notification-forwarding-details" type="b">
       <default>true</default>
       <summary>Forward notification details</summary>
-      <description>Append the notification body after a warning-light separator in forwarded small notifications.</description>
+      <description>Append the notification body after a monochrome bell separator in forwarded small notifications.</description>
     </key>
     <key name="notification-filter" type="as">
       <default>[]</default>

@@ -567,6 +567,7 @@ export default class DynamicBarPreferences extends ExtensionPreferences {
         finePage.add(notifyGroup);
         addSpinRow(notifyGroup, settings, 'small-notification-height', 'Small notification height (px)', {min: 6, max: 40, step: 1});
         addSpinRow(notifyGroup, settings, 'small-notification-font-size', 'Small notification font size (px)', {min: 6, max: 20, step: 1});
+        addSpinRow(notifyGroup, settings, 'small-notification-duration', 'Small notification duration (ms)', {min: 200, max: 15000, step: 100});
 
         const animationGroup = new Adw.PreferencesGroup({title: 'Animation'});
         finePage.add(animationGroup);
@@ -576,7 +577,6 @@ export default class DynamicBarPreferences extends ExtensionPreferences {
         addSpinRow(animationGroup, settings, 'collapse-duration', 'Collapse duration (ms)', {min: 50, max: 2000, step: 10});
         addSpinRow(animationGroup, settings, 'auto-collapse-delay', 'Auto collapse after (ms)', {min: 0, max: 10000, step: 100});
         addSpinRow(animationGroup, settings, 'notification-decay', 'Notification decay (ms)', {min: 500, max: 15000, step: 100});
-        addSpinRow(animationGroup, settings, 'track-flash-duration', 'Track flash duration (ms)', {min: 200, max: 5000, step: 100});
 
         const contentPage = new Adw.PreferencesPage({
             title: 'Content',

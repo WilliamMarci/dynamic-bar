@@ -3,7 +3,8 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
-import {BarProvider, smallNotificationHeight, smallNotificationLabel}
+import {BarProvider, smallNotificationDuration, smallNotificationHeight,
+    smallNotificationLabel}
     from '../provider.js';
 import {MprisService} from '../services/mprisService.js';
 import {createProgressBar} from '../progressBar.js';
@@ -168,7 +169,7 @@ export class MediaProvider extends BarProvider {
             destroyIslandActor() {},
         };
         this.bar.notification(provider, {
-            timeout: this._settings.get_int('track-flash-duration'),
+            timeout: smallNotificationDuration(this._settings),
             passive: true,
             width: 192,
             height,
