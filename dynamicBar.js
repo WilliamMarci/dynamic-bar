@@ -55,6 +55,18 @@ const DOT_PLACEMENT = Object.freeze({
     NORMAL: 'normal',
     INDEX_ZERO: 'index-zero',
 });
+// Visual group order is left-to-right. Since the tray is right-aligned, the
+// final group's rightmost member owns public slot index 0.
+const DOT_GROUP = Object.freeze({
+    DEVICE: 'device',
+    ACTIVITY: 'activity',
+    TIMER: 'timer',
+});
+const DOT_GROUP_ORDER = Object.freeze([
+    DOT_GROUP.DEVICE,
+    DOT_GROUP.ACTIVITY,
+    DOT_GROUP.TIMER,
+]);
 const DOT_INSERTION = Object.freeze({
     POP: 'pop',
     RISE_AND_SHIFT: 'rise-and-shift',
@@ -724,26 +736,26 @@ export const DynamicBar = GObject.registerClass({
     _activityDotPolicy(state) {
         if (state.kind === 'device') {
             return {
+                group: DOT_GROUP.DEVICE,
                 placement: DOT_PLACEMENT.LEADING,
                 insertion: DOT_INSERTION.RISE_AND_SHIFT,
-                placementRank: 0,
                 newestAtRight: false,
                 shiftsExisting: true,
             };
         }
         if (state.kind === 'timer') {
             return {
+                group: DOT_GROUP.TIMER,
                 placement: DOT_PLACEMENT.INDEX_ZERO,
                 insertion: DOT_INSERTION.POP,
-                placementRank: 2,
                 newestAtRight: true,
                 shiftsExisting: false,
             };
         }
         return {
+            group: DOT_GROUP.ACTIVITY,
             placement: DOT_PLACEMENT.NORMAL,
             insertion: DOT_INSERTION.POP,
-            placementRank: 1,
             newestAtRight: false,
             shiftsExisting: false,
         };
@@ -752,8 +764,10 @@ export const DynamicBar = GObject.registerClass({
     _compareActivityDots(left, right) {
         const leftPolicy = this._activityDotPolicy(left[1]);
         const rightPolicy = this._activityDotPolicy(right[1]);
-        if (leftPolicy.placementRank !== rightPolicy.placementRank)
-            return leftPolicy.placementRank - rightPolicy.placementRank;
+        const leftGroup = DOT_GROUP_ORDER.indexOf(leftPolicy.group);
+        const rightGroup = DOT_GROUP_ORDER.indexOf(rightPolicy.group);
+        if (leftGroup !== rightGroup)
+            return leftGroup - rightGroup;
         const leftCreated = Number(left[1]._dotSequence ??
             left[1].createdAt ?? 0);
         const rightCreated = Number(right[1]._dotSequence ??
