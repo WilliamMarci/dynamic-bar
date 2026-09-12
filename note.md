@@ -190,13 +190,15 @@ Activity dot 列表以 dynamic bar 左侧图标区的右边缘为锚点，最新
 
 Activity dot 列表的最终锚点必须来自当前帧 dynamic bar progress track 的实际左端，而不是目标 bar 宽度、左右区最大自然宽度或动画结束后的预测位置。dot box 在 left zone 内右对齐，最右 dot 与当前 progress 左端之间始终保留 `ZONE_GAP`；bar 的 x/width 动画每帧变化时左右图标区同步跟随。
 
-所有折叠态状态圆点——`island run`、`island -e` 扩展任务、普通 Activity、Timer 和 Device——必须以“一任务一圆点”通过 `DynamicBarApi.activityDot()` 进入同一个动态 registry 与 `_activityBox` 容器，不得在发布前按 group 合并。圆点槽位从右向左编号，最右为 index 0；同类任务按创建时间保持稳定，新任务向左增加。Device 固定占据最大的若干 index（视觉上位于队列最左侧）。删除任意圆点后，仅空位左侧的圆点向右滑动补位，右侧圆点位置不变；所有点统一继承间距、hover 进度预览、点击精确聚焦对应任务、Shift 固定及销毁动画。旧 `activity()` 只保留为兼容别名。CardDeck 底部的 page 导航圆点表达页面位置，不是 Activity 状态，因此继续由 CardDeck 独立管理。
+所有折叠态状态圆点——`island run`、`island -e` 扩展任务、普通 Activity、Timer 和 Device——必须以“一任务一圆点”通过 `DynamicBarApi.activityDot()` 进入同一个动态 registry 与 `_activityBox` 容器，不得在发布前按 group 合并。圆点槽位从右向左编号，最右为 index 0；新任务插入所属组的最右槽，同组旧任务向左顺延。Device 固定占据最大的若干 index（视觉上位于队列最左侧）。删除任意圆点后，仅空位左侧的圆点向右滑动补位，右侧圆点位置不变；所有点统一继承间距、hover 进度预览、点击精确聚焦对应任务、Shift 固定及销毁动画。旧 `activity()` 只保留为兼容别名。CardDeck 底部的 page 导航圆点表达页面位置，不是 Activity 状态，因此继续由 CardDeck 独立管理。
 
-新增 Device dot 使用专用插入动画：已有 dots 按新增 Device 的槽位数量整体向右滑动腾位，Device 从 dynamic bar 下方向上进入并淡入。该动画只由 registry 成员新增触发，电量、容量、颜色和连接状态刷新不得重复播放。
+新增 Device dot 仍遵循通用组内插槽位移，只把自身入场方式替换为从 dynamic bar 下方向上进入并淡入；其他组不得因 Device 入场产生额外的反向位移。该动画只由 registry 成员新增触发，电量、容量、颜色和连接状态刷新不得重复播放。
 
 Dot 排列与进入动画必须由统一 policy 描述，布局主循环不得按 Provider 名称写死分支。Placement 至少提供 `leading`、`normal`、`index-zero` 三个区域，Insertion 至少提供 `pop` 与 `rise-and-shift`。Device 使用 `leading + rise-and-shift`；普通 Activity 使用 `normal + pop`；Timer 使用 `index-zero + pop`。因此 Timer 区始终位于最右侧，多个 Timer 中最新创建者严格占据 index 0，其余向左排列。新增类型只需声明 policy 即可复用槽位计算和补位动画。
 
 Dot tray 的分组顺序显式定义为 `[Device | Activity | Timer]`（视觉从左到右），而不是依靠零散的 placement 数字排序。Tray 整体右对齐，因此 Timer 组的最右项就是全局 index 0。新增 Timer 插入 Timer 组右端，原有非 Timer dots 按一个真实槽位向左移动；各组内部顺序不因其他组成员变化而重排。
+
+所有 dot 类型都遵循同一个组内插入规则：新成员插入所属组的第一个（该组最右槽），该插入点左侧的旧成员整体向左移动一个槽位；删除时反向补位。Timer 位于最右组，所以新增 Timer 会推动整个既有列表向左，不能向 progress bar 方向生长。Left zone 宽度必须从当前子 actor（尤其 dot tray）的真实宽度重新计算，不得读取上一次显式 allocation 作为 preferred width。
 
 多 page 模式的 disclosure toggle 必须完全位于 island 内：左右控制 cell 对称包含 `card-page-edge-padding`，右侧按钮占固定 38px 并放在 right cell 的左侧，cell 尾部留下真实边距且裁剪主题绘制。GNOME 主题的按钮最小宽度不得把 hover/focus 背景撑出 island；动画或展开计算仍以按钮自身右上角为基点。
 

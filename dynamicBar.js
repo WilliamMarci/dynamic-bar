@@ -739,8 +739,7 @@ export const DynamicBar = GObject.registerClass({
                 group: DOT_GROUP.DEVICE,
                 placement: DOT_PLACEMENT.LEADING,
                 insertion: DOT_INSERTION.RISE_AND_SHIFT,
-                newestAtRight: false,
-                shiftsExisting: true,
+                newestAtRight: true,
             };
         }
         if (state.kind === 'timer') {
@@ -749,15 +748,13 @@ export const DynamicBar = GObject.registerClass({
                 placement: DOT_PLACEMENT.INDEX_ZERO,
                 insertion: DOT_INSERTION.POP,
                 newestAtRight: true,
-                shiftsExisting: false,
             };
         }
         return {
             group: DOT_GROUP.ACTIVITY,
             placement: DOT_PLACEMENT.NORMAL,
             insertion: DOT_INSERTION.POP,
-            newestAtRight: false,
-            shiftsExisting: false,
+            newestAtRight: true,
         };
     }
 
@@ -772,8 +769,9 @@ export const DynamicBar = GObject.registerClass({
             left[1].createdAt ?? 0);
         const rightCreated = Number(right[1]._dotSequence ??
             right[1].createdAt ?? 0);
-        // Visual order is left-to-right. index-zero lanes place their newest
-        // member at the right edge; other lanes grow toward the left.
+        // Every new member is inserted at the first (rightmost) slot of its
+        // group. Existing members of that group, and all groups to its left,
+        // move one slot left as a normal array insertion.
         const created = leftPolicy.newestAtRight
             ? leftCreated - rightCreated
             : rightCreated - leftCreated;
@@ -793,8 +791,6 @@ export const DynamicBar = GObject.registerClass({
         const insertedPolicies = new Map(entries
             .filter(([id]) => !oldOrder.includes(id))
             .map(([id, state]) => [id, this._activityDotPolicy(state)]));
-        const shiftingInsertions = [...insertedPolicies.values()]
-            .filter(policy => policy.shiftsExisting).length;
         const risingIds = new Set([...insertedPolicies]
             .filter(([, policy]) =>
                 policy.insertion === DOT_INSERTION.RISE_AND_SHIFT)
@@ -982,11 +978,6 @@ export const DynamicBar = GObject.registerClass({
                     const newDistance = newOrder.length - 1 -
                         newOrder.indexOf(activityId);
                     let delta = -(oldDistance - newDistance) * slot;
-                    // Device insertion is deliberately more expressive than
-                    // ordinary task insertion: all existing dots travel
-                    // right by one slot while the device rises into the gap.
-                    if (shiftingInsertions > 0)
-                        delta -= shiftingInsertions * slot;
                     if (delta !== 0) {
                         holder.translation_x = delta;
                         holder.ease({translation_x: 0, duration: 220,
@@ -1609,8 +1600,16 @@ export const DynamicBar = GObject.registerClass({
 
         const options = this._options;
         const [, panelY] = panelBox.get_transformed_position();
-        const [, leftNatural] = this._leftZone.get_preferred_width(-1);
-        const [, rightNatural] = this._rightZone.get_preferred_width(-1);
+        // Zones receive an explicit allocation every frame, so asking the
+        // zone itself for its preferred width can return that stale previous
+        // allocation. Measure current children instead; otherwise a growing
+        // dot tray remains in the old left zone and overflows toward the bar.
+        const childrenWidth = zone => zone.get_children().reduce((width, child) => {
+            const [, natural] = child.get_preferred_width(-1);
+            return Math.max(width, child.width, natural);
+        }, 0);
+        const leftNatural = childrenWidth(this._leftZone);
+        const rightNatural = childrenWidth(this._rightZone);
         const sideWidth = Math.max(ZONE_SIZE, leftNatural, rightNatural);
         const rootWidth = Math.max(options.barLongWidth, this._islandWidth) +
             (sideWidth + ZONE_GAP) * 2;
