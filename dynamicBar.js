@@ -726,6 +726,11 @@ export const DynamicBar = GObject.registerClass({
             return created || right[0].localeCompare(left[0]);
         });
         const newOrder = entries.map(([id]) => id);
+        const insertedDeviceIds = new Set(entries
+            .filter(([id, state]) => state.kind === 'device' &&
+                !oldOrder.includes(id))
+            .map(([id]) => id));
+        const insertedDeviceSlots = insertedDeviceIds.size;
         const membershipChanged = oldOrder.length !== newOrder.length ||
             oldOrder.some((id, index) => newOrder[index] !== id);
         this._activityBox.remove_all_children();
@@ -884,12 +889,23 @@ export const DynamicBar = GObject.registerClass({
             if (membershipChanged && this._options.animationsEnabled) {
                 const oldIndex = oldOrder.indexOf(activityId);
                 if (oldIndex < 0) {
-                    visual.scale_x = 0.25;
-                    visual.scale_y = 0.25;
-                    visual.opacity = 0;
-                    visual.ease({scale_x: 1, scale_y: 1, opacity: 255,
-                        duration: 240,
-                        mode: Clutter.AnimationMode.EASE_OUT_BACK});
+                    if (insertedDeviceIds.has(activityId)) {
+                        // A device joins from below after the existing row
+                        // visibly makes room for its reserved left-hand slot.
+                        holder.translation_y = hitSize + ACTIVITY_DOT_GAP + 3;
+                        visual.opacity = 0;
+                        holder.ease({translation_y: 0, duration: 240,
+                            mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+                        visual.ease({opacity: 255, duration: 180,
+                            mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+                    } else {
+                        visual.scale_x = 0.25;
+                        visual.scale_y = 0.25;
+                        visual.opacity = 0;
+                        visual.ease({scale_x: 1, scale_y: 1, opacity: 255,
+                            duration: 240,
+                            mode: Clutter.AnimationMode.EASE_OUT_BACK});
+                    }
                 } else {
                     // Positions are anchored at the right edge beside the bar.
                     // Comparing distance-from-right makes only dots left of a
@@ -897,7 +913,12 @@ export const DynamicBar = GObject.registerClass({
                     const oldDistance = oldOrder.length - 1 - oldIndex;
                     const newDistance = newOrder.length - 1 -
                         newOrder.indexOf(activityId);
-                    const delta = -(oldDistance - newDistance) * slot;
+                    let delta = -(oldDistance - newDistance) * slot;
+                    // Device insertion is deliberately more expressive than
+                    // ordinary task insertion: all existing dots travel
+                    // right by one slot while the device rises into the gap.
+                    if (insertedDeviceSlots > 0)
+                        delta -= insertedDeviceSlots * slot;
                     if (delta !== 0) {
                         holder.translation_x = delta;
                         holder.ease({translation_x: 0, duration: 220,
