@@ -359,7 +359,8 @@ export class MediaProvider extends BarProvider {
         });
 
         const pageWidth = this._pageWidth();
-        const paddingX = this.getLayoutOptions().paddingX;
+        const paddingX = this.getLayoutOptions().paddingX +
+            this._settings.get_int('card-page-edge-padding');
         const coverSize = pageWidth < 280 ? 44 : 60;
         const top = new St.BoxLayout({style_class: 'dynamic-bar-media-top'});
         const cover = this._createCover(coverSize);

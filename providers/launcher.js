@@ -21,13 +21,15 @@ export class LauncherProvider extends BarProvider {
     }
 
     getLayoutOptions() {
-        return {paddingX: 16, paddingY: 10,
+        return {paddingX: 16 + this._settings.get_int('card-page-edge-padding'),
+            paddingY: 10,
             minWidth: this._settings.get_int('card-page-width')};
     }
 
     getAttachedPage() {
         return {
             id: 'launcher',
+            layout: {paddingX: 16, paddingY: 10},
             createActor: () => this.createIslandActor(),
             onDestroy: () => this.destroyIslandActor?.(),
         };

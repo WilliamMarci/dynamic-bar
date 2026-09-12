@@ -70,6 +70,11 @@
       <summary>Persistent card page width</summary>
       <description>Shared compact width for persistent island pages.</description>
     </key>
+    <key name="card-page-edge-padding" type="i">
+      <default>6</default><range min="0" max="32"/>
+      <summary>Shared page edge padding</summary>
+      <description>Extra horizontal inset added to every island page.</description>
+    </key>
     <key name="panel-top-radius" type="i">
       <default>8</default>
       <summary>Fusion fillet radius</summary>

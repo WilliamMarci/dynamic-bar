@@ -616,7 +616,8 @@ export class LiveActivityProvider extends BarProvider {
 
         const actions = this._visibleActions(task);
         const buttonCount = actions.length + (task.logPath ? 1 : 0) + 1;
-        const contentWidth = this._settings.get_int('card-page-width') - 20;
+        const inset = 10 + this._settings.get_int('card-page-edge-padding');
+        const contentWidth = this._settings.get_int('card-page-width') - inset * 2;
         const indicatorWidth = task.indicator?.icon ? 18 : 0;
         const percentWidth = Math.max(14, Math.round(contentWidth * 0.05));
         const controlsWidth = buttonCount * 22 + Math.max(0, buttonCount - 1) * 2;

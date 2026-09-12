@@ -1272,7 +1272,8 @@ export const DynamicBar = GObject.registerClass({
 
     _onSettingsChanged(key = '') {
         this._reloadOptions();
-        if (key === 'card-page-width' && this._expanded && this._deck)
+        if ((key === 'card-page-width' || key === 'card-page-edge-padding') &&
+            this._expanded && this._deck)
             this.cardsChanged();
         this._syncLayout();
         this._updatePanelColor(false);
