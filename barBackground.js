@@ -185,10 +185,11 @@ class BarBackground extends St.DrawingArea {
         const target = Math.min(Math.max(progress, 0), 1);
         this._activityColor = style.color ?? null;
         this._activityStriped = style.striped ?? false;
-        this._activityStripeAnimated = this._activityStriped;
+        this._activityStripeAnimated = style.animateStripes ??
+            this._activityStriped;
         this._activityPreviewPinned = false;
         this._stopStripeTick();
-        if (this._activityStriped)
+        if (this._activityStriped && this._activityStripeAnimated)
             this._stripedTick();
         if (this._glowActive) {
             this._targetProgress = target;
@@ -242,9 +243,15 @@ class BarBackground extends St.DrawingArea {
         }
     }
 
-    playActivation(target, duration = 480) {
+    playActivation(target, duration = 480, style = {}) {
         this._stopTick();
-        this._activityColor = null;
+        this._activityColor = style.color ?? null;
+        this._activityStriped = style.striped ?? false;
+        this._activityStripeAnimated = style.animateStripes ??
+            this._activityStriped;
+        this._stopStripeTick();
+        if (this._activityStriped && this._activityStripeAnimated)
+            this._stripedTick();
         this._progress = 0;
         this._glowActive = true;
         this._glowAngle = 0;
@@ -388,7 +395,9 @@ class BarBackground extends St.DrawingArea {
                 const gradient = new Cairo.LinearGradient(
                     cx - dx, cy - dy, cx + dx, cy + dy);
                 gradient.addColorStopRGBA(0, 0.30, 0.55, 1.0, 0.05);
-                gradient.addColorStopRGBA(0.5, 0.55, 0.82, 1.0, 1.0);
+                // Keep the hot spot saturated. A near-white midpoint reads as
+                // a white defect when it crosses the centre of a short bar.
+                gradient.addColorStopRGBA(0.5, 0.18, 0.62, 1.0, 1.0);
                 gradient.addColorStopRGBA(1, 0.60, 0.35, 1.0, 0.10);
                 cr.save();
                 cr.translate(1, 1);

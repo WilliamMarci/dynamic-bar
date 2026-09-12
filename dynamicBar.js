@@ -544,6 +544,7 @@ export const DynamicBar = GObject.registerClass({
         this._progressStyle = {
             color: this._parseColor(style.color),
             striped: Boolean(style.striped),
+            animateStripes: style.animateStripes ?? Boolean(style.striped),
         };
         if (this._activityPinnedId)
             return;
@@ -909,7 +910,7 @@ export const DynamicBar = GObject.registerClass({
     playMediaActivation(progress) {
         if (this._activityPinnedId)
             return;
-        this._bar.playActivation(progress, 480);
+        this._bar.playActivation(progress, 480, this._progressStyle);
     }
 
     pushNotification(provider, options = {}) {

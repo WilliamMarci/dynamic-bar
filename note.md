@@ -172,6 +172,12 @@ Island 是迷你控件。常驻 page 使用 200–500px 的统一可调总宽度
 
 Activity 创建后延迟到 small notification 结束附近，在不改变 bar 几何的情况下短暂展示缩小版 Activity 进度；首次从 0 生长。Shift 固定 dot 后持续显示，后续上报从当前动画帧缓动到新值，不能每次重置到 0。running/warning 的暗色斜纹移动，paused 和终态保留静止斜纹。
 
+Launcher 的整组内容始终按 page 中线居中，不能因为右侧 disclosure 锚点改变而偏移。卡片通过滚轮、页点或按钮左右切换时，旧页沿切换反方向滑出、新页从切换方向滑入；快速连续切换必须先安全收束前一动画，不能残留 actor 或触发两次销毁。
+
+Media 启动光效只绘制饱和色的旋转边框，不能在渐变中点产生白色亮块。Dynamic bar 的斜纹动画由当前进度所有者的运行状态控制：running 时移动，paused 时立即停在当前相位，恢复后从该相位继续。
+
+第三方能力放在 `extensions/<id>/`，每项包含 `manifest.ini`，并通过 `sdk/live_activity.hpp` 的 v2 D-Bus 客户端发布 Activity；不得导入 Shell 内部对象。`island list` 统一枚举内置 progress adapter 与扩展 manifest。首个参考扩展 `file-operations` 提供带字节进度的递归 copy/move，跨文件系统移动必须完整复制成功后才删除源路径；Dynamic Bar 不在线时文件操作仍可独立完成。
+
 Activity 完成后的生命周期由 `Automatically remove completed activities` 和过期秒数统一控制；关闭自动移除时终态保留到用户 Stop tracking。显式由兼容 API 提供的 `expiresAt` 优先于全局默认。Island 已经展开时切歌只更新 Media page，不再发送重复的 small notification。固定 Activity 后它独占 dynamic bar 绘制层：Media 可以继续缓存播放进度，但 position 刷新、切歌 reset 和 activation 动画均不得覆盖固定进度；取消固定或固定任务消失后恢复最新 Media progress。
 
 卡片左右边距必须由真实几何 frame 保证，不能依赖 `Clutter.BinLayout` 子项的 CSS margin。`card-page-width` 表示包含左右边距的总宽度。紧凑列表先计算最右侧实际按钮数量与宽度，再从剩余宽度按设计比例分配标题、progress 和 value；按钮始终右对齐，标题左对齐并只在空间确实不足时省略。列表 progress 厚度是 Fine Tune 的独立设置。Timer started 使用普通两行 notification，不使用 small notification。Dynamic bar 的 Media、Activity、Timer、Device 分别具有可配置颜色和斜纹开关，固定与临时预览都必须遵守当前类型的绘制设置。

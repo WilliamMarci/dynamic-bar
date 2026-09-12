@@ -90,6 +90,33 @@ static void printAdapters() {
     for (const auto& info : ProgressAdapters::available())
         std::cout << "  " << info.id << "\n    commands: " << info.commands
                   << "\n    " << info.description << "\n";
+
+    // Out-of-process extensions are discovered from manifests beside tools/.
+    // Their failures stay isolated from both this wrapper and GNOME Shell.
+    std::error_code error;
+    const auto executable = std::filesystem::canonical("/proc/self/exe", error);
+    const auto directory = executable.parent_path().parent_path() / "extensions";
+    if (!error && std::filesystem::is_directory(directory)) {
+        std::cout << "\nInstalled extensions:\n";
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            const auto manifest = entry.path() / "manifest.ini";
+            if (!std::filesystem::is_regular_file(manifest)) continue;
+            std::ifstream input(manifest);
+            std::string line, id, commands, description;
+            while (std::getline(input, line)) {
+                const auto split = line.find('=');
+                if (split == std::string::npos) continue;
+                const auto key = line.substr(0, split);
+                const auto value = line.substr(split + 1);
+                if (key == "id") id = value;
+                else if (key == "commands") commands = value;
+                else if (key == "description") description = value;
+            }
+            if (!id.empty())
+                std::cout << "  " << id << "\n    commands: " << commands
+                          << "\n    " << description << "\n";
+        }
+    }
 }
 
 static unsigned parseDuration(const std::string& text) {

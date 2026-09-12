@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
@@ -60,8 +61,8 @@ export class LauncherProvider extends BarProvider {
     createIslandActor() {
         const box = new St.BoxLayout({
             style_class: 'dynamic-bar-launcher',
-            x_align: 1,
-            y_align: 1,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
         });
 
         for (const item of getLauncherItems(this._settings)) {
@@ -173,7 +174,15 @@ export class LauncherProvider extends BarProvider {
         });
         box.add_child(settingsButton);
 
-        return box;
+        // The card actor is deliberately full width. Keep the launcher row at
+        // its natural width in a centred bin so changing the trailing
+        // disclosure-button anchor cannot pull the launcher off centre.
+        const root = new St.Widget({
+            layout_manager: new Clutter.BinLayout(),
+            x_expand: true,
+        });
+        root.add_child(box);
+        return root;
     }
 
     destroy() {

@@ -72,6 +72,7 @@ export class IslandCardDeck {
         this._toggle = null;
         this._toggleIcon = null;
         this._lastScrollAt = 0;
+        this._retiringFrames = [];
     }
 
     addCard({id, createActor, onDestroy = null, layout = null}) {
@@ -172,14 +173,19 @@ export class IslandCardDeck {
         return this._root;
     }
 
-    selectCard(idOrIndex) {
+    selectCard(idOrIndex, direction = 0) {
         const index = typeof idOrIndex === 'number'
             ? idOrIndex
             : this._cards.findIndex(card => card.id === idOrIndex);
         if (index < 0 || index >= this._cards.length)
             return;
+        if (index === this._activeIndex && index === this._displayedIndex)
+            return;
+        const previous = this._activeIndex;
         this._activeIndex = index;
-        this._showCard(index);
+        if (!direction)
+            direction = index > previous ? 1 : -1;
+        this._showCard(index, direction);
         this._rebuildStrip();
         this._onCardSelected?.(this.activeId);
         this._changed();
@@ -247,6 +253,7 @@ export class IslandCardDeck {
     }
 
     destroy() {
+        this._finishRetiringFrames();
         this._destroyCard();
         this._destroyAttached();
         this._root = null;
@@ -258,10 +265,15 @@ export class IslandCardDeck {
         this._toggleIcon = null;
     }
 
-    _showCard(index) {
+    _showCard(index, direction = 0) {
         if (!this._cardHolder || !this._cards[index])
             return;
-        this._destroyCard();
+        this._finishRetiringFrames();
+        const oldFrame = this._cardFrame;
+        const oldIndex = this._displayedIndex;
+        oldFrame?.remove_all_transitions();
+        this._cardActor = null;
+        this._cardFrame = null;
         this._displayedIndex = index;
         try {
             this._cardActor = this._cards[index].createActor?.() ?? null;
@@ -289,6 +301,40 @@ export class IslandCardDeck {
             });
             this._cardFrame.add_child(this._cardActor);
             this._cardHolder.add_child(this._cardFrame);
+            const animate = Boolean(oldFrame && direction &&
+                this._settings.get_boolean('animations-enabled'));
+            if (oldFrame) {
+                const retire = () => {
+                    const position = this._retiringFrames.findIndex(item =>
+                        item.frame === oldFrame);
+                    if (position >= 0)
+                        this._retiringFrames.splice(position, 1);
+                    oldFrame.destroy();
+                    this._cards[oldIndex]?.onDestroy?.();
+                };
+                if (animate) {
+                    this._retiringFrames.push({frame: oldFrame, index: oldIndex});
+                    const distance = this._pageWidth();
+                    this._cardFrame.translation_x = direction * distance;
+                    this._cardFrame.opacity = 180;
+                    oldFrame.ease({
+                        translation_x: -direction * distance,
+                        opacity: 120,
+                        duration: 220,
+                        mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+                        onComplete: retire,
+                    });
+                    this._cardFrame.ease({
+                        translation_x: 0,
+                        opacity: 255,
+                        duration: 220,
+                        mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+                    });
+                } else {
+                    oldFrame.destroy();
+                    this._cards[oldIndex]?.onDestroy?.();
+                }
+            }
             GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 if (this._cardActor !== cardActor)
                     return GLib.SOURCE_REMOVE;
@@ -299,6 +345,14 @@ export class IslandCardDeck {
                         `holder ${this._cardHolder.width}px`, this._cards[index].id);
                 return GLib.SOURCE_REMOVE;
             });
+        }
+    }
+
+    _finishRetiringFrames() {
+        for (const {frame, index} of this._retiringFrames.splice(0)) {
+            frame.remove_all_transitions();
+            frame.destroy();
+            this._cards[index]?.onDestroy?.();
         }
     }
 
@@ -351,7 +405,7 @@ export class IslandCardDeck {
             if (this._attached)
                 this.toggleAttached();
             else
-                this.selectCard((this._activeIndex + 1) % this._cards.length);
+                this.selectCard((this._activeIndex + 1) % this._cards.length, 1);
         });
 
         // Fixed 38px side cells keep the navigation exactly centered while the
@@ -400,7 +454,7 @@ export class IslandCardDeck {
             });
             dot.connect('clicked', () => {
                 this._onInteraction?.();
-                this.selectCard(index);
+                this.selectCard(index, index > this._activeIndex ? 1 : -1);
             });
             this._navigation.add_child(dot);
         });
@@ -438,7 +492,7 @@ export class IslandCardDeck {
         this._lastScrollAt = timestamp;
         this._onInteraction?.();
         this.selectCard((this._activeIndex + step + this._cards.length) %
-            this._cards.length);
+            this._cards.length, step);
         return Clutter.EVENT_STOP;
     }
 

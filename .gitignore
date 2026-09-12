@@ -1,5 +1,6 @@
 schemas/gschemas.compiled
 tools/island
+extensions/file-operations/island-file
 *.log
 *.tmp
 *~
